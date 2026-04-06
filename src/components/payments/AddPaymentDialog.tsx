@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CreditCard, DollarSign, Receipt, Calculator, Sparkles, AlertCircle } from 'lucide-react'
+import { CreditCard, DollarSign, Receipt, Sparkles, AlertCircle } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import type { Payment } from '@/types'
@@ -33,7 +33,7 @@ interface AddPaymentDialogProps {
 export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatientId }: AddPaymentDialogProps) {
 
   const { toast } = useToast()
-  const { createPayment, updatePayment, isLoading, getPaymentsByPatient, getPaymentsByAppointment, getPaymentsByToothTreatment } = usePaymentStore()
+  const { createPayment, updatePayment, isLoading, getPaymentsByAppointment, getPaymentsByToothTreatment } = usePaymentStore()
   const { patients } = usePatientStore()
   const { appointments } = useAppointmentStore()
   const { toothTreatments, loadToothTreatmentsByPatient } = useDentalTreatmentStore()
@@ -426,7 +426,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         paymentData.treatment_remaining_balance = remainingBalance
       } else if (formData.appointment_id && formData.appointment_id !== 'none') {
         // دفعة مرتبطة بموعد - استخدام المبلغ الإجمالي المدخل يدوياً
-        paymentData.appointment_total_cost = totalAmountDue
+        paymentData.treatment_total_cost = totalAmountDue
 
         // حساب المبلغ المدفوع والمتبقي للموعد
         const amountPaid = calculateTotalAmountPaid()
@@ -567,30 +567,30 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[1800px] max-h-[95vh] overflow-y-auto bg-background border-border shadow-2xl" dir="rtl">
-        <DialogHeader className="border-b border-border pb-4">
-          <DialogTitle className="flex items-center text-xl font-semibold text-foreground">
-            <CreditCard className="w-5 h-5 ml-2 text-primary" />
+      <DialogContent className="w-full max-w-md md:max-w-2xl lg:max-w-3xl max-h-[90vh] overflow-y-auto bg-background border-border shadow-2xl p-0 rounded-xl" dir="rtl">
+        <DialogHeader className="border-b border-border pb-4 px-4 md:px-6 pt-4 md:pt-6 sticky top-0 bg-background z-10">
+          <DialogTitle className="flex items-center gap-2 text-xl md:text-2xl font-bold text-foreground">
+            <CreditCard className="w-5 h-5 md:w-6 md:h-6 text-primary" />
             تسجيل دفعة جديدة
           </DialogTitle>
-          <DialogDescription className="text-muted-foreground">
+          <DialogDescription className="text-sm md:text-base text-muted-foreground">
             أدخل تفاصيل الدفعة الجديدة وتتبع المدفوعات
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 md:space-y-6 p-4 md:pb-6">
           {/* Patient Selection */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg text-card-foreground">
-                <Receipt className="w-4 h-4 ml-2 text-primary" />
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 px-4 md:px-5 pt-4 md:pt-5">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-card-foreground">
+                <Receipt className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 معلومات المريض
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="space-y-4 pt-0 px-4 md:px-5 pb-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 {/* Patient Selection */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">المريض *</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">المريض *</Label>
                   <Select
                     value={formData.patient_id}
                     onValueChange={(value) => setFormData(prev => ({
@@ -599,7 +599,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       appointment_id: 'none'
                     }))}
                   >
-                    <SelectTrigger className={errors.patient_id ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}>
+                    <SelectTrigger className={`h-10 w-full ${errors.patient_id ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}`}>
                       <SelectValue placeholder="اختر المريض" className="text-muted-foreground" />
                     </SelectTrigger>
                     <SelectContent>
@@ -617,17 +617,17 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
                 {/* Treatment Selection */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">العلاج *</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">العلاج *</Label>
                   <Select
                     value={formData.tooth_treatment_id}
                     onValueChange={(value) => setFormData(prev => ({
                       ...prev,
                       tooth_treatment_id: value,
-                      appointment_id: 'none' // إعادة تعيين الموعد عند اختيار علاج
+                      appointment_id: 'none'
                     }))}
                     disabled={!formData.patient_id}
                   >
-                    <SelectTrigger className="bg-background border-input text-foreground">
+                    <SelectTrigger className="h-10 w-full bg-background border-input text-foreground">
                       <SelectValue placeholder="اختر العلاج" className="text-muted-foreground" />
                     </SelectTrigger>
                     <SelectContent>
@@ -661,7 +661,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
                 {/* Appointment Selection (للتوافق مع النظام القديم) - مخفي */}
                 <div className="space-y-2 hidden">
-                  <Label className="text-foreground font-medium">الموعد (اختياري)</Label>
+                  <Label className="text-foreground font-medium text-base">الموعد (اختياري)</Label>
                   <Select
                     value={formData.appointment_id}
                     onValueChange={(value) => setFormData(prev => ({
@@ -689,18 +689,18 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           </Card>
 
           {/* Amount Fields */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg text-card-foreground">
-                <DollarSign className="w-4 h-4 ml-2 text-primary" />
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 px-4 md:px-5 pt-4 md:pt-5">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-card-foreground">
+                <DollarSign className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 تفاصيل المبالغ
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="pt-0 px-4 md:px-5 pb-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
                 {/* Amount */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">المبلغ *</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">المبلغ *</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -713,11 +713,10 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       setFormData(prev => ({ ...prev, amount: value.toString() }))
                     }}
                     onKeyDown={(e) => {
-                      // منع انتشار الحدث لضمان عدم تفعيل الاختصارات
                       e.stopPropagation()
                     }}
                     data-prevent-shortcuts="true"
-                    className={errors.amount ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}
+                    className={`h-10 w-full text-sm md:text-base ${errors.amount ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}`}
                   />
                   {errors.amount && (
                     <p className="text-sm text-destructive">{errors.amount}</p>
@@ -726,7 +725,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
                 {/* Discount Amount */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">مبلغ الخصم</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">مبلغ الخصم</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -738,13 +737,13 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       const value = parseFloat(e.target.value) || 0
                       setFormData(prev => ({ ...prev, discount_amount: value.toString() }))
                     }}
-                    className="bg-background border-input text-foreground"
+                    className="h-10 w-full text-sm md:text-base bg-background border-input text-foreground"
                   />
                 </div>
 
                 {/* Tax Amount */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">مبلغ الضريبة</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">مبلغ الضريبة</Label>
                   <Input
                     type="number"
                     step="0.1"
@@ -756,7 +755,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       const value = parseFloat(e.target.value) || 0
                       setFormData(prev => ({ ...prev, tax_amount: value.toString() }))
                     }}
-                    className="bg-background border-input text-foreground"
+                    className="h-10 w-full text-sm md:text-base bg-background border-input text-foreground"
                   />
                 </div>
               </div>
@@ -764,25 +763,25 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           </Card>
 
           {/* Payment Details */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg text-card-foreground">
-                <CreditCard className="w-4 h-4 ml-2 text-primary" />
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 px-4 md:px-5 pt-4 md:pt-5">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-card-foreground">
+                <CreditCard className="w-4 h-4 md:w-5 md:h-5 text-primary" />
                 تفاصيل الدفع
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="pt-0 px-4 md:px-5 pb-5">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5">
                 {/* Payment Method */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">طريقة الدفع</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">طريقة الدفع</Label>
                   <Select
                     value={formData.payment_method}
                     onValueChange={(value: 'cash' | 'bank_transfer') =>
                       setFormData(prev => ({ ...prev, payment_method: value }))
                     }
                   >
-                    <SelectTrigger className="bg-background border-input text-foreground">
+                    <SelectTrigger className="h-10 w-full bg-background border-input text-foreground">
                       <SelectValue placeholder="اختر طريقة الدفع" className="text-muted-foreground" />
                     </SelectTrigger>
                     <SelectContent>
@@ -794,12 +793,12 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
                 {/* Payment Date */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">تاريخ الدفع *</Label>
+                  <Label className="text-foreground font-medium text-sm md:text-base">تاريخ الدفع *</Label>
                   <Input
                     type="date"
                     value={formData.payment_date}
                     onChange={(e) => setFormData(prev => ({ ...prev, payment_date: e.target.value }))}
-                    className={errors.payment_date ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}
+                    className={`h-10 w-full text-sm md:text-base ${errors.payment_date ? 'border-destructive bg-background text-foreground' : 'bg-background border-input text-foreground'}`}
                   />
                   {errors.payment_date && (
                     <p className="text-sm text-destructive">{errors.payment_date}</p>
@@ -808,7 +807,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
                 {/* Status */}
                 <div className="space-y-2">
-                  <Label className="text-foreground font-medium">
+                  <Label className="text-foreground font-medium text-sm md:text-base">
                     الحالة
                     {formData.amount && parseFloat(formData.amount) > 0 && (
                       <span className="text-xs text-muted-foreground mr-2">
@@ -823,7 +822,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       setFormData(prev => ({ ...prev, status: value }))
                     }
                   >
-                    <SelectTrigger className="bg-background border-input text-foreground">
+                    <SelectTrigger className="h-10 w-full bg-background border-input text-foreground">
                       <SelectValue placeholder="اختر الحالة" className="text-muted-foreground" />
                     </SelectTrigger>
                     <SelectContent>
@@ -859,36 +858,36 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           </Card>
 
           {/* Payment Tracking Section */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-lg text-card-foreground">
-                <Sparkles className="w-4 h-4 ml-2 text-primary" />
-                تتبع المدفوعات للموعد
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 px-4 md:px-5 pt-4 md:pt-5">
+              <CardTitle className="flex items-center gap-2 text-base md:text-lg text-card-foreground">
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 text-primary" />
+                تتبع المدفوعات
               </CardTitle>
-              <CardDescription className="text-muted-foreground">
-                تتبع دقيق للمدفوعات والرصيد المتبقي لكل موعد على حدة
+              <CardDescription className="text-sm md:text-base text-muted-foreground">
+                تتبع دقيق للمدفوعات والرصيد المتبقي
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-0 px-4 md:px-5 pb-5">
               {/* Appointment Payment Summary */}
               {formData.appointment_id && formData.appointment_id !== 'none' && (
-                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800 shadow-sm transition-all duration-200">
+                <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/50 dark:to-blue-900/30 border-blue-200 dark:border-blue-800 shadow-sm transition-all duration-200 rounded-lg">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                       <span className="text-sm font-medium text-primary">ملخص مدفوعات الموعد</span>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">المبلغ الإجمالي المطلوب:</span>
+                        <span className="text-muted-foreground">الإجمالي المطلوب:</span>
                         <span className="font-medium text-foreground">{getTotalAmountDue().toFixed(2)} $</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">المدفوع سابقاً:</span>
+                        <span className="text-muted-foreground">المدفوع:</span>
                         <span className="font-medium text-foreground">{autoCalculations.previousPayments.toFixed(2)} $</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">المتبقي قبل هذه الدفعة:</span>
+                        <span className="text-muted-foreground">المتبقي:</span>
                         <span className="font-medium text-emerald-600 dark:text-emerald-400">
                           {(getTotalAmountDue() - autoCalculations.previousPayments).toFixed(2)} $
                         </span>
@@ -897,7 +896,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                     {formData.amount && (
                       <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
                         <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">المتبقي بعد هذه الدفعة:</span>
+                          <span className="text-muted-foreground">المتبقي بعد الدفعة:</span>
                           <span className="font-bold text-lg text-emerald-600 dark:text-emerald-400">
                             {calculateRemainingBalance().toFixed(2)} $
                           </span>
@@ -909,57 +908,55 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
               )}
 
               {formData.appointment_id === 'none' && (
-                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/50 dark:to-yellow-900/30 border-yellow-200 dark:border-yellow-800 shadow-sm transition-all duration-200">
+                <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 dark:from-yellow-950/50 dark:to-yellow-900/30 border-yellow-200 dark:border-yellow-800 shadow-sm transition-all duration-200 rounded-lg">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
-                      <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">دفعة عامة غير مرتبطة بموعد</span>
+                      <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">دفعة عامة</span>
                     </div>
                     <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                      هذه دفعة عامة غير مرتبطة بموعد محدد، يمكنك تحديد المبلغ المطلوب يدوياً
+                      دفعة غير مرتبطة بموعد محدد، يمكنك تحديد المبلغ المطلوب يدوياً
                     </p>
                   </CardContent>
                 </Card>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                 {/* Total Amount Due */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-foreground font-medium">
+                  <Label className="flex items-center gap-2 text-foreground font-medium text-sm md:text-base">
                     المبلغ الإجمالي المطلوب
-                    <Badge variant="secondary" className="text-xs">
-                      اختياري
-                    </Badge>
+                    <Badge variant="secondary" className="text-xs">اختياري</Badge>
                   </Label>
                   <Input
                     type="number"
                     step="0.1"
-                    placeholder="أدخل المبلغ الإجمالي المطلوب (اختياري)"
+                    placeholder="أدخل المبلغ الإجمالي (اختياري)"
                     value={formData.total_amount_due}
                     onChange={(e) => setFormData(prev => ({ ...prev, total_amount_due: e.target.value }))}
                     onBlur={(e) => {
                       const value = parseFloat(e.target.value) || 0
                       setFormData(prev => ({ ...prev, total_amount_due: value.toString() }))
                     }}
-                    className={`bg-background border-input text-foreground ${errors.total_amount_due ? 'border-destructive' : ''}`}
+                    className={`h-10 w-full text-sm md:text-base bg-background border-input text-foreground ${errors.total_amount_due ? 'border-destructive' : ''}`}
                   />
                   {errors.total_amount_due && (
                     <p className="text-sm text-destructive">{errors.total_amount_due}</p>
                   )}
                   {!errors.total_amount_due && (
                     <p className="text-xs text-muted-foreground">
-                      💡 إدخال المبلغ الإجمالي يساعد في تتبع المدفوعات الجزئية
+                      💡 أدخل المبلغ الإجمالي لتتبع المدفوعات الجزئية
                     </p>
                   )}
                 </div>
 
                 {/* Amount Paid */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2 text-foreground font-medium">
+                  <Label className="flex items-center gap-2 text-foreground font-medium text-sm md:text-base">
                     إجمالي المبلغ المدفوع
                     <Badge variant="secondary" className="text-xs">
                       <Sparkles className="w-3 h-3 ml-1" />
-                      محسوب تلقائياً
+                      تلقائي
                     </Badge>
                   </Label>
                   <Input
@@ -968,17 +965,17 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                     placeholder="0.00"
                     value={formData.amount_paid}
                     readOnly
-                    className="bg-muted cursor-not-allowed border-input text-foreground font-medium"
+                    className="h-10 w-full text-sm md:text-base bg-muted cursor-not-allowed border-input text-foreground font-medium"
                   />
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                    ✓ محسوب تلقائياً: المدفوعات السابقة ({formatAmount(autoCalculations.previousPayments)}) + هذه الدفعة ({formatAmount(parseFloat(formData.amount) || 0)})
+                    ✓ المدفوعات السابقة ({formatAmount(autoCalculations.previousPayments)}) + هذه ({formatAmount(parseFloat(formData.amount) || 0)})
                   </p>
                 </div>
               </div>
 
               {/* Remaining Balance Display */}
               {formData.total_amount_due && (
-                <Card className={`shadow-sm transition-all duration-200 ${
+                <Card className={`shadow-sm transition-all duration-200 rounded-lg ${
                   calculateRemainingBalance() > 0
                     ? "bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950/50 dark:to-orange-900/30 border-orange-200 dark:border-orange-800"
                     : "bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/50 dark:to-green-900/30 border-green-200 dark:border-green-800"
@@ -998,8 +995,8 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
               )}
 
               {/* Payment Summary */}
-              <Card className="bg-gradient-to-r from-muted/30 to-muted/50 border-border">
-                <CardHeader>
+              <Card className="bg-gradient-to-r from-muted/30 to-muted/50 border-border rounded-lg">
+                <CardHeader className="pb-2">
                   <CardTitle className="text-sm text-card-foreground">ملخص هذه الدفعة</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-sm">
@@ -1031,18 +1028,18 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           </Card>
 
           {/* Additional Information */}
-          <Card className="border-border bg-card shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg text-card-foreground">معلومات إضافية</CardTitle>
+          <Card className="border-border bg-card shadow-sm rounded-xl">
+            <CardHeader className="pb-3 px-4 md:px-5 pt-4 md:pt-5">
+              <CardTitle className="text-base md:text-lg text-card-foreground">معلومات إضافية</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-4 pt-0 px-4 md:px-5 pb-5">
               {/* Receipt Number */}
               <div className="space-y-2">
-                <Label className="flex items-center gap-2 text-foreground">
+                <Label className="flex items-center gap-2 text-foreground font-medium text-sm md:text-base">
                   رقم الإيصال
                   <Badge variant="secondary" className="text-xs">
                     <Sparkles className="w-3 h-3 ml-1" />
-                    مولد تلقائياً
+                    تلقائي
                   </Badge>
                 </Label>
                 <div className="flex gap-2">
@@ -1051,14 +1048,14 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                     placeholder="رقم الإيصال"
                     value={formData.receipt_number}
                     onChange={(e) => setFormData(prev => ({ ...prev, receipt_number: e.target.value }))}
-                    className="flex-1 bg-background border-input text-foreground"
+                    className="flex-1 h-10 text-sm md:text-base bg-background border-input text-foreground"
                   />
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setFormData(prev => ({ ...prev, receipt_number: generateReceiptNumber() }))}
-                    className="px-3"
+                    className="px-3 h-10"
                   >
                     <Sparkles className="w-4 h-4" />
                   </Button>
@@ -1070,43 +1067,44 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
               {/* Description */}
               <div className="space-y-2">
-                <Label className="text-foreground">الوصف</Label>
+                <Label className="text-foreground text-sm md:text-base">الوصف</Label>
                 <Textarea
                   placeholder="وصف الدفعة (اختياري)"
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   rows={2}
-                  className="bg-background border-input text-foreground placeholder:text-muted-foreground"
+                  className="text-sm md:text-base bg-background border-input text-foreground placeholder:text-muted-foreground resize-none"
                 />
               </div>
 
               {/* Notes */}
               <div className="space-y-2">
-                <Label className="text-foreground">ملاحظات</Label>
+                <Label className="text-foreground text-sm md:text-base">ملاحظات</Label>
                 <Textarea
                   placeholder="ملاحظات إضافية (اختياري)"
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                   rows={2}
-                  className="bg-background border-input text-foreground placeholder:text-muted-foreground"
+                  className="text-sm md:text-base bg-background border-input text-foreground placeholder:text-muted-foreground resize-none"
                 />
               </div>
             </CardContent>
           </Card>
 
-          <DialogFooter className="flex justify-end space-x-2 space-x-reverse border-t border-border pt-4">
+          <DialogFooter className="flex flex-col md:flex-row justify-end gap-2 md:gap-3 border-t border-border pt-4 md:pt-5 mt-2 px-4 md:px-5 pb-4 md:pb-5">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={isLoading}
+              className="w-full md:w-auto h-10 text-sm md:text-base order-2 md:order-1"
             >
               إلغاء
             </Button>
             <Button
               type="submit"
               disabled={isLoading}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              className="w-full md:w-auto h-10 text-sm md:text-base order-1 md:order-2 bg-primary hover:bg-primary/90 text-primary-foreground"
             >
               {isLoading ? 'جاري الحفظ...' : 'حفظ الدفعة'}
             </Button>
