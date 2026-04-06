@@ -110,10 +110,7 @@ function AppContent() {
   const [showAddPatient, setShowAddPatient] = useState(false)
   const [showAddPayment, setShowAddPayment] = useState(false)
   const [loginLoading, setLoginLoading] = useState(false)
-
-
-
-
+  const [sidebarOpen, setSidebarOpen] = useState(true)
 
   // Appointment states
   const [showAddAppointment, setShowAddAppointment] = useState(false)
@@ -390,13 +387,36 @@ function AppContent() {
     return pageMap[activeTab as keyof typeof pageMap] || 'لوحة التحكم'
   }
 
+  const toggleSidebar = (newOpen?: boolean) => {
+    if (newOpen !== undefined) {
+      setSidebarOpen(newOpen)
+    } else {
+      setSidebarOpen(!sidebarOpen)
+    }
+  }
+
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider open={sidebarOpen} onOpenChange={toggleSidebar}>
         <AppSidebar activeTab={activeTab} onTabChange={setActiveTab} />
         <SidebarInset>
-          <header className="flex h-12 sm:h-14 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 rtl-layout">
+          <header className="flex h-12 sm:h-14 shrink-0 items-center gap-2 transition-all duration-300 ease-in-out bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border/40 rtl-layout">
             <div className="flex items-center gap-1 sm:gap-2 px-1 sm:px-2">
-              <SidebarTrigger className="h-8 w-8 sm:h-9 sm:w-9" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={toggleSidebar}
+                className="h-8 w-8 sm:h-9 sm:w-9"
+              >
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  className={`h-5 w-5 transition-transform duration-300 ${sidebarOpen ? '' : 'rotate-180'}`} 
+                  fill="none" 
+                  viewBox="0 0 24 24" 
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </Button>
               <Breadcrumb>
                 <BreadcrumbList className="flex-rtl">
                   <BreadcrumbItem className="hidden lg:block">

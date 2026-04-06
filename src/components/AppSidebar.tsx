@@ -110,13 +110,18 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 export function AppSidebar({ activeTab, onTabChange, ...props }: AppSidebarProps) {
   const clinicName = useStableClinicName()
   const doctorName = useStableDoctorName()
-  const clinicLogo = useStableClinicLogo()
 
   return (
-    <Sidebar collapsible="icon" side="right" className="border-r border-border/20 rtl-layout glass-card" style={{
-      boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.06)',
-      background: 'hsl(var(--sidebar-background))'
-    }} {...props}>
+    <Sidebar 
+      collapsible="offcanvas" 
+      side="right" 
+      className="border-r border-border/20 rtl-layout glass-card transition-all duration-300 ease-in-out" 
+      style={{
+        boxShadow: '-4px 0 24px rgba(0, 0, 0, 0.06)',
+        background: 'hsl(var(--sidebar-background))'
+      }} 
+      {...props}
+    >
 
   
             <div className="flex items-center gap-2 p-2 rounded-xl hover:bg-accent/20 transition-all duration-300 ease-out cursor-pointer group">
