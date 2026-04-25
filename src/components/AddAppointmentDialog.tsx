@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
+import { Combobox } from '@/components/ui/combobox'
 
 interface AddAppointmentDialogProps {
   isOpen: boolean
@@ -324,31 +325,25 @@ export default function AddAppointmentDialog({
                   <User className="w-4 h-4 ml-1" />
                   المريض *
                 </Label>
-                <Select
+                <Combobox
+                  options={patients.map(p => ({
+                    value: p.id,
+                    label: p.full_name
+                  }))}
                   value={formData.patient_id}
-                  onValueChange={(value) => {
+                  onChange={(value) => {
                     setFormData(prev => ({ ...prev, patient_id: value }))
                     const patient = patients.find(p => p.id === value)
                     if (patient) {
                       setFormData(prev => ({
                         ...prev,
-                        patient_id: value,
                         gender: patient.gender === 'male' ? 'ذكر' : patient.gender === 'female' ? 'أنثى' : ''
                       }))
                     }
                   }}
-                >
-                  <SelectTrigger className="bg-background border-input text-foreground">
-                    <SelectValue placeholder="اختر المريض" className="text-muted-foreground" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map(patient => (
-                      <SelectItem key={patient.id} value={patient.id}>
-                        {patient.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  placeholder="ابحث عن مريض..."
+                  emptyMessage="لا يوجد مرضى مطابقين"
+                />
               </div>
 
               <div className="space-y-2">
