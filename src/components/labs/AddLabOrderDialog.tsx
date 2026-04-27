@@ -340,7 +340,7 @@ export default function AddLabOrderDialog({ open, onOpenChange, editingOrder }: 
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground text-right">
-                  المدفوع: {formatCurrency(editingOrder.paid_amount || 0)} | للدفع: استخدم "دفعة عامة"
+                  المدفوع: {formatCurrency(editingOrder.paid_amount || 0)} | للدفع: استخدم "دفعة شاملة"
                 </div>
               </div>
             )}
@@ -351,7 +351,7 @@ export default function AddLabOrderDialog({ open, onOpenChange, editingOrder }: 
               <CreditCard className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
               <div className="text-xs text-blue-800 dark:text-blue-200 text-right">
                 <div className="font-medium mb-1">ملاحظة:</div>
-                <div>لإضافة دفعات لهذا الطلب بعد الإنشاء، استخدم زر "دفعة عامة" من قائمة الطلبات</div>
+                <div>لإضافة دفعات لهذا الطلب بعد الإنشاء، استخدم زر "دفعة شاملة" من قائمة الطلبات</div>
               </div>
             </div>
           )}

@@ -208,9 +208,28 @@ export function calculatePatientPaymentSummary(patientId: string, payments: Paym
     }
   })
 
-  // إضافة المدفوعات العامة غير المرتبطة بمواعيد (فقط الجزئية والمكتملة)
+  // إضافة المدفوعات المرتبطة بالعلاجات (فقط الجزئية والمكتملة)
+  const activeTreatmentPayments = patientPayments.filter(payment =>
+    payment.tooth_treatment_id &&
+    (payment.status === 'partial' || payment.status === 'completed')
+  )
+  const activeTreatmentGroups: { [treatmentId: string]: Payment[] } = {}
+  activeTreatmentPayments.forEach(payment => {
+    if (!activeTreatmentGroups[payment.tooth_treatment_id!]) {
+      activeTreatmentGroups[payment.tooth_treatment_id!] = []
+    }
+    activeTreatmentGroups[payment.tooth_treatment_id!].push(payment)
+  })
+  Object.values(activeTreatmentGroups).forEach(group => {
+    const treatmentCost = group[0].treatment_total_cost || 0
+    totalDue += treatmentCost
+    totalPaid += group.reduce((sum, p) => sum + p.amount, 0)
+  })
+
+  // إضافة المدفوعات العامة غير المرتبطة بمواعيد أو علاجات (فقط الجزئية والمكتملة)
   const generalPayments = patientPayments.filter(payment =>
     !payment.appointment_id &&
+    !payment.tooth_treatment_id &&
     (payment.status === 'partial' || payment.status === 'completed')
   )
   generalPayments.forEach(payment => {
@@ -223,14 +242,14 @@ export function calculatePatientPaymentSummary(patientId: string, payments: Paym
   // حساب المبلغ المتبقي من الدفعات الجزئية فقط
   let totalRemaining = 0
 
-  // المبلغ المتبقي من المواعيد (فقط من الدفعات الجزئية)
+  // المبلغ المتبقي من المواعيد (من جميع الدفعات المكتملة والجزئية)
   patientAppointments.forEach(appointment => {
     if (appointment.cost) {
-      const partialPayments = patientPayments.filter(p =>
-        p.appointment_id === appointment.id && p.status === 'partial'
+      const allPayments = patientPayments.filter(p =>
+        p.appointment_id === appointment.id && (p.status === 'partial' || p.status === 'completed')
       )
-      if (partialPayments.length > 0) {
-        const totalPaidForAppointment = partialPayments.reduce((sum, p) => sum + p.amount, 0)
+      if (allPayments.length > 0) {
+        const totalPaidForAppointment = allPayments.reduce((sum, p) => sum + p.amount, 0)
         totalRemaining += Math.max(0, appointment.cost - totalPaidForAppointment)
       }
     }
@@ -246,9 +265,9 @@ export function calculatePatientPaymentSummary(patientId: string, payments: Paym
     }
   })
 
-  // المبلغ المتبقي من العلاجات (فقط من الدفعات الجزئية)
+  // المبلغ المتبقي من العلاجات (من جميع الدفعات المكتملة والجزئية)
   const treatmentPayments = patientPayments.filter(payment =>
-    payment.tooth_treatment_id && payment.status === 'partial'
+    payment.tooth_treatment_id && (payment.status === 'partial' || payment.status === 'completed')
   )
   const treatmentGroups: { [treatmentId: string]: Payment[] } = {}
   treatmentPayments.forEach(payment => {

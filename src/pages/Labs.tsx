@@ -536,7 +536,7 @@ export default function Labs() {
                     onClick={() => setShowPaymentDialog(true)}
                   >
                     <CreditCard className="w-4 h-4 mr-2" />
-                    دفعة عامة
+                    دفعة شاملة
                   </Button>
                   <Button onClick={handleAddNewLabOrder} className="btn-modern btn-modern-primary">
                     <Plus className="w-4 h-4 mr-2" />

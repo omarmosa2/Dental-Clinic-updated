@@ -1,6 +1,6 @@
 {
   "name": "dental-clinic-management-aggoracode",
-  "version": "2.7.1",
+  "version": "2.8.0",
   "description": "Dental Clinic Management AgorraCode",
   "author": "AgorraCode Team",
   "main": "electron/main.js",

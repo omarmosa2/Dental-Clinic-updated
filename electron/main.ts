@@ -298,6 +298,37 @@ ipcMain.handle('db:payments:search', async (_, query) => {
   }
 })
 
+// Comprehensive Payment IPC Handlers
+ipcMain.handle('db:payments:createComprehensive', async (_, patientId, totalAmount, paymentData) => {
+  try {
+    console.log('Creating comprehensive payment:', { patientId, totalAmount, paymentData })
+    const result = await databaseService.createComprehensivePayment(patientId, totalAmount, paymentData)
+    console.log('Comprehensive payment created successfully:', result)
+    return result
+  } catch (error) {
+    console.error('Error creating comprehensive payment:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:payments:getUnpaidTreatments', async (_, patientId) => {
+  try {
+    const treatments = await databaseService.getToothTreatmentsByPatient(patientId)
+    const unpaidTreatments = treatments.filter((t: any) => {
+      const totalPaid = t.total_paid || 0
+      const cost = t.cost || 0
+      return cost > totalPaid
+    }).map((t: any) => ({
+      ...t,
+      remaining_balance: (t.cost || 0) - (t.total_paid || 0)
+    }))
+    return unpaidTreatments
+  } catch (error) {
+    console.error('Error getting unpaid treatments:', error)
+    throw error
+  }
+})
+
 // Treatment IPC Handlers
 ipcMain.handle('db:treatments:getAll', async () => {
   return await databaseService.getAllTreatments()

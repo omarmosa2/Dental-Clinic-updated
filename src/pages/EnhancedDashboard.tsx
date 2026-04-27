@@ -246,7 +246,7 @@ export default function EnhancedDashboard({
         <div className="w-full">
           <div className="flex items-center gap-2 sm:gap-3 mb-1 sm:mb-2">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
-              مرحباً بك في تطبيق {clinicName}
+              مرحباً بك في تطبيق إدارة العيادة السنية
             </h1>
           </div>
           <p className="text-sm sm:text-base text-muted-foreground">

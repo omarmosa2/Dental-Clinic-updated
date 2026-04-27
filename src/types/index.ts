@@ -72,6 +72,10 @@ export interface Payment {
   amount_paid?: number // إجمالي المبلغ المدفوع (للمدفوعات العامة)
   remaining_balance?: number // المبلغ المتبقي (للمدفوعات العامة)
 
+  // حقل الدفعة الشاملة
+  is_comprehensive?: boolean // true إذا كانت دفعة شاملة توزع على عدة علاجات
+  comprehensive_batch_id?: string // UUID مشترك لجميع الدفعات في نفس المجموعة الشاملة
+
   created_at: string
   updated_at: string
   // Populated fields

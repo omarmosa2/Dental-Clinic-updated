@@ -758,8 +758,6 @@ ${address ? `📍 العنوان: ${address}` : ''}
             )}
           </div>
 
-          <div className="separator">═══════════════════</div>
-
           <div className="receipt-title">
             إيصال دفع رقم {payment.receipt_number || `RCP-${payment.id.slice(-6)}`}
           </div>
@@ -772,7 +770,7 @@ ${address ? `📍 العنوان: ${address}` : ''}
                 <span className="value">{formatDate(payment.payment_date)}</span>
               </div>
 
-              <div className="info-row">
+              {/* <div className="info-row">
                 <span className="label">الوقت:</span>
                 <span className="value">
                   {new Date(payment.payment_date).toLocaleTimeString('ar-SA', {
@@ -781,7 +779,7 @@ ${address ? `📍 العنوان: ${address}` : ''}
                     hour12: true
                   })}
                 </span>
-              </div>
+              </div> */}
 
               <div className="info-row">
                 <span className="label">المريض:</span>
@@ -791,31 +789,6 @@ ${address ? `📍 العنوان: ${address}` : ''}
                     : 'غير محدد'}
                 </span>
               </div>
-
-              {payment.patient?.phone && (
-                <div className="info-row">
-                  <span className="label">الهاتف:</span>
-                  <span className="value">{payment.patient.phone}</span>
-                </div>
-              )}
-
-              <div className="info-row">
-                <span className="label">طريقة الدفع:</span>
-                <span className="value">{getPaymentMethodLabel(payment.payment_method)}</span>
-              </div>
-
-              {payment.description && (
-                <div className="info-row">
-                  <span className="label">الوصف:</span>
-                  <span className="value">{payment.description}</span>
-                </div>
-              )}
-
-              <div className="info-row">
-                <span className="label">حالة الدفعة:</span>
-                <span className="value">{getStatusLabel(payment.status)}</span>
-              </div>
-
               {/* معلومات الموعد المرتبط */}
               {payment.appointment_id && (
                 <div className="info-row">
@@ -824,9 +797,6 @@ ${address ? `📍 العنوان: ${address}` : ''}
                 </div>
               )}
             </div>
-
-            <div className="separator">- - - - - - - - - - - - - - - -</div>
-
             {/* Amount Section */}
             <div className="amount-section">
               {/* معلومات الدفعة الحالية */}
@@ -842,17 +812,9 @@ ${address ? `📍 العنوان: ${address}` : ''}
                 </div>
               )}
 
-              {payment.tax_amount && payment.tax_amount > 0 && (
-                <div className="amount-row">
-                  <span>الضريبة:</span>
-                  <span>+{formatAmount(payment.tax_amount)}</span>
-                </div>
-              )}
-
               {/* معلومات إضافية للمدفوعات الجزئية */}
               {payment.status === 'partial' && (
                 <>
-                  <div className="separator">- - - - - - - - - - - - - - - -</div>
 
                   {/* إجمالي المبلغ المطلوب */}
                   {(payment.total_amount_due || payment.appointment_total_cost) && (
@@ -895,7 +857,6 @@ ${address ? `📍 العنوان: ${address}` : ''}
                 </>
               )}
 
-              <div className="separator">═══════════════════</div>
 
               <div className="total-amount">
                 المبلغ الإجمالي لهذه الدفعة: {formatAmount(

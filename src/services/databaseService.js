@@ -5361,9 +5361,32 @@ class DatabaseService {
 
   // ==================== CLINIC EXPENSES METHODS ====================
 
+  ensurePaymentsColumns() {
+    try {
+      const columns = this.db.prepare("PRAGMA table_info(payments)").all()
+      const columnNames = columns.map(col => col.name)
+      
+      if (!columnNames.includes('is_comprehensive')) {
+        this.db.exec('ALTER TABLE payments ADD COLUMN is_comprehensive INTEGER DEFAULT 0')
+        console.log('✅ Added is_comprehensive column to payments table')
+      }
+      
+      if (!columnNames.includes('tooth_treatment_id')) {
+        this.db.exec('ALTER TABLE payments ADD COLUMN tooth_treatment_id TEXT')
+        console.log('✅ Added tooth_treatment_id column to payments table')
+      }
+
+      if (!columnNames.includes('comprehensive_batch_id')) {
+        this.db.exec('ALTER TABLE payments ADD COLUMN comprehensive_batch_id TEXT')
+        console.log('✅ Added comprehensive_batch_id column to payments table')
+      }
+    } catch (error) {
+      console.error('Error ensuring payments columns:', error)
+    }
+  }
+
   ensureClinicExpensesTableExists() {
     try {
-      // Check if clinic_expenses table exists
       const tableExists = this.db.prepare(`
         SELECT name FROM sqlite_master WHERE type='table' AND name='clinic_expenses'
       `).get()
@@ -5552,6 +5575,127 @@ class DatabaseService {
       ORDER BY payment_date DESC, created_at DESC
     `)
     return stmt.all()
+  }
+async getToothTreatmentsByPatient(patientId) {
+    try {
+      this.ensureToothTreatmentsTableExists()
+      this.ensurePaymentsColumns()
+      const stmt = this.db.prepare(`
+        SELECT tt.*, a.title as appointment_title
+        FROM tooth_treatments tt
+        LEFT JOIN appointments a ON tt.appointment_id = a.id
+        WHERE tt.patient_id = ?
+        ORDER BY tt.tooth_number ASC, tt.priority ASC
+      `)
+      return stmt.all(patientId)
+    } catch (error) {
+      console.error('Error getting tooth treatments by patient:', error)
+      return []
+    }
+  }
+
+  async createComprehensivePayment(patientId, totalAmount, paymentData) {
+    const now = new Date().toISOString()
+    const discountAmount = paymentData.discount_amount || 0
+    const taxAmount = paymentData.tax_amount || 0
+    const finalAmount = totalAmount + taxAmount - discountAmount
+    const batchId = require('uuid').v4()
+
+    try {
+      const result = this.db.transaction(() => {
+        this.ensurePaymentsColumns()
+
+        const unpaidTreatments = this.db.prepare(`
+          SELECT tt.*,
+            COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0) as total_paid,
+            tt.cost - COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0) as remaining_balance
+          FROM tooth_treatments tt
+          WHERE tt.patient_id = ?
+          AND tt.cost > COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0)
+          ORDER BY remaining_balance ASC
+        `).all(patientId)
+
+        if (unpaidTreatments.length === 0) {
+          return { success: false, message: 'هذا المريض ليس لديه علاجات غير مدفوعة', paymentsCreated: 0, distribution: [], batchId: null }
+        }
+
+        const totalRemaining = unpaidTreatments.reduce((sum, t) => sum + t.remaining_balance, 0)
+
+        if (totalRemaining <= 0) {
+          return { success: false, message: 'هذا المريض ليس لديه علاجات غير مدفوعة', paymentsCreated: 0, distribution: [], batchId: null }
+        }
+
+        if (finalAmount <= 0) {
+          return { success: false, message: 'المبلغ المدفوع يجب أن يكون أكبر من صفر', paymentsCreated: 0, distribution: [], batchId: null }
+        }
+
+        let remainingToDistribute = finalAmount
+        const distribution = []
+        const createdPaymentIds = []
+
+        for (const treatment of unpaidTreatments) {
+          if (remainingToDistribute <= 0) break
+
+          const amountForThisTreatment = Math.min(remainingToDistribute, treatment.remaining_balance)
+          const newTotalPaid = treatment.total_paid + amountForThisTreatment
+          const newRemainingBalance = Math.max(0, treatment.cost - newTotalPaid)
+          const status = newRemainingBalance <= 0 ? 'completed' : 'partial'
+          const paymentId = require('uuid').v4()
+
+          this.db.prepare(`
+            INSERT INTO payments (
+              id, patient_id, tooth_treatment_id, amount, payment_method, payment_date,
+              description, receipt_number, status, notes, discount_amount, tax_amount,
+              total_amount, treatment_total_cost, treatment_total_paid, treatment_remaining_balance,
+              is_comprehensive, comprehensive_batch_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).run(
+            paymentId, patientId, treatment.id, amountForThisTreatment,
+            paymentData.payment_method, paymentData.payment_date,
+            paymentData.description || ('دفعة شاملة - السن ' + treatment.tooth_number),
+            paymentData.receipt_number || ('RCP-COMP-' + Date.now().toString().slice(-6)),
+            status, paymentData.notes, 0, 0, amountForThisTreatment,
+            treatment.cost, newTotalPaid, newRemainingBalance,
+            1, batchId, now, now
+          )
+
+          createdPaymentIds.push(paymentId)
+          distribution.push({
+            paymentId,
+            treatmentId: treatment.id,
+            toothNumber: treatment.tooth_number,
+            toothName: treatment.tooth_name,
+            treatmentType: treatment.treatment_type,
+            treatmentCost: treatment.cost,
+            previousPaid: treatment.total_paid,
+            amountPaid: amountForThisTreatment,
+            newTotalPaid,
+            newRemainingBalance,
+            status
+          })
+          remainingToDistribute -= amountForThisTreatment
+        }
+
+        this.db.prepare('DELETE FROM payments WHERE patient_id = ? AND tooth_treatment_id IS NOT NULL AND status = ? AND is_comprehensive = 0').run(patientId, 'pending')
+
+        return {
+          success: true,
+          message: ('تم توزيع الدفعة على ' + distribution.length + ' علاج بنجاح'),
+          paymentsCreated: distribution.length,
+          distribution,
+          batchId,
+          totalAmount: finalAmount,
+          totalRemaining,
+          remainingToDistribute: Math.max(0, remainingToDistribute)
+        }
+      })()
+
+      this.db.pragma('wal_checkpoint(TRUNCATE)')
+      return result
+    } catch (error) {
+      console.error('Error creating comprehensive payment:', error)
+      throw error
+    }
   }
 }
 

@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { CreditCard, DollarSign, Receipt, Sparkles, User, Calendar, FileText, CheckCircle2, AlertCircle } from 'lucide-react'
+import { CreditCard, DollarSign, Sparkles, User, Calendar, FileText, CheckCircle2, Layers } from 'lucide-react'
 import { useCurrency } from '@/contexts/CurrencyContext'
 import type { Payment } from '@/types'
 import { Combobox } from '@/components/ui/combobox'
@@ -32,7 +32,7 @@ interface AddPaymentDialogProps {
 export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatientId }: AddPaymentDialogProps) {
 
   const { toast } = useToast()
-  const { createPayment, updatePayment, isLoading, getPaymentsByAppointment, getPaymentsByToothTreatment } = usePaymentStore()
+  const { createPayment, updatePayment, isLoading, getPaymentsByToothTreatment, createComprehensivePayment, getUnpaidTreatmentsForPatient } = usePaymentStore()
   const { patients } = usePatientStore()
   const { toothTreatments, loadToothTreatmentsByPatient } = useDentalTreatmentStore()
   const { formatAmount } = useCurrency()
@@ -54,6 +54,10 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [previousPayments, setPreviousPayments] = useState(0)
+  const [unpaidTreatments, setUnpaidTreatments] = useState<any[]>([])
+  const [totalUnpaidBalance, setTotalUnpaidBalance] = useState(0)
+  const [isComprehensive, setIsComprehensive] = useState(false)
+  const [patientRemainingBalances, setPatientRemainingBalances] = useState<Map<string, number>>(new Map())
 
   const generateReceiptNumber = () => {
     const now = new Date()
@@ -82,6 +86,12 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     const amount = getCurrentAmount()
     const totalDue = getTotalAmountDue()
 
+    if (isComprehensive) {
+      if (amount >= totalUnpaidBalance) return 'completed'
+      if (amount > 0) return 'partial'
+      return 'pending'
+    }
+
     if (totalDue > 0 && formData.tooth_treatment_id !== 'none') {
       const newTotalPaid = previousPayments + amount
       if (newTotalPaid >= totalDue) return 'completed'
@@ -93,8 +103,64 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     return 'pending'
   }
 
+  // Load unpaid treatments when patient changes
   useEffect(() => {
-    if (formData.tooth_treatment_id && formData.tooth_treatment_id !== 'none') {
+    if (formData.patient_id && formData.patient_id !== '') {
+      loadToothTreatmentsByPatient(formData.patient_id)
+      loadUnpaidTreatments(formData.patient_id)
+    } else {
+      setUnpaidTreatments([])
+      setTotalUnpaidBalance(0)
+    }
+  }, [formData.patient_id, loadToothTreatmentsByPatient])
+
+  const loadUnpaidTreatments = async (patientId: string) => {
+    try {
+      const treatments = await getUnpaidTreatmentsForPatient(patientId)
+      setUnpaidTreatments(treatments)
+      const total = treatments.reduce((sum: number, t: any) => sum + (t.remaining_balance || 0), 0)
+      setTotalUnpaidBalance(total)
+    } catch (error) {
+      console.error('Failed to load unpaid treatments:', error)
+      setUnpaidTreatments([])
+      setTotalUnpaidBalance(0)
+    }
+  }
+
+  useEffect(() => {
+    if (open && patients.length > 0) {
+      patients.forEach(async (patient) => {
+        try {
+          const treatments = await getUnpaidTreatmentsForPatient(patient.id)
+          const total = treatments.reduce((sum: number, t: any) => sum + (t.remaining_balance || 0), 0)
+          setPatientRemainingBalances(prev => {
+            const next = new Map(prev)
+            next.set(patient.id, total)
+            return next
+          })
+        } catch {
+          setPatientRemainingBalances(prev => {
+            const next = new Map(prev)
+            next.set(patient.id, 0)
+            return next
+          })
+        }
+      })
+    }
+  }, [open, patients.length])
+
+  // Handle treatment selection change
+  useEffect(() => {
+    if (formData.tooth_treatment_id === 'comprehensive') {
+      setIsComprehensive(true)
+      setFormData(prev => ({
+        ...prev,
+        total_amount_due: totalUnpaidBalance.toString(),
+        amount: totalUnpaidBalance.toString(),
+        receipt_number: prev.receipt_number || generateReceiptNumber()
+      }))
+    } else if (formData.tooth_treatment_id && formData.tooth_treatment_id !== 'none') {
+      setIsComprehensive(false)
       const selectedTreatment = toothTreatments.find(t => t.id === formData.tooth_treatment_id)
       const treatmentCost = selectedTreatment?.cost || 0
       const prevPayments = calculatePreviousPaymentsForTreatment(formData.tooth_treatment_id)
@@ -108,16 +174,17 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         receipt_number: prev.receipt_number || generateReceiptNumber()
       }))
     } else {
+      setIsComprehensive(false)
       setPreviousPayments(0)
     }
-  }, [formData.tooth_treatment_id, toothTreatments])
+  }, [formData.tooth_treatment_id, toothTreatments, totalUnpaidBalance])
 
   useEffect(() => {
-    if (formData.amount && previousPayments >= 0) {
+    if (formData.amount && (previousPayments >= 0 || isComprehensive)) {
       const suggestedStatus = getSuggestedStatus()
       setFormData(prev => ({ ...prev, status: suggestedStatus }))
     }
-  }, [formData.amount, formData.total_amount_due, formData.tooth_treatment_id, previousPayments])
+  }, [formData.amount, formData.total_amount_due, formData.tooth_treatment_id, previousPayments, isComprehensive, totalUnpaidBalance])
 
   useEffect(() => {
     if (!open) {
@@ -137,6 +204,9 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       })
       setErrors({})
       setPreviousPayments(0)
+      setUnpaidTreatments([])
+      setTotalUnpaidBalance(0)
+      setIsComprehensive(false)
     }
   }, [open])
 
@@ -145,12 +215,6 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       setFormData(prev => ({ ...prev, patient_id: preSelectedPatientId }))
     }
   }, [open, preSelectedPatientId])
-
-  useEffect(() => {
-    if (formData.patient_id && formData.patient_id !== '') {
-      loadToothTreatmentsByPatient(formData.patient_id)
-    }
-  }, [formData.patient_id, loadToothTreatmentsByPatient])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
@@ -172,7 +236,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       newErrors.payment_date = 'يرجى اختيار تاريخ الدفع'
     }
 
-    if (formData.tooth_treatment_id !== 'none' && totalDue > 0) {
+    if (!isComprehensive && formData.tooth_treatment_id !== 'none' && totalDue > 0) {
       const remainingBefore = totalDue - previousPayments
       if (amount > remainingBefore) {
         newErrors.amount = `المبلغ لا يمكن أن يتجاوز المتبقي (${formatAmount(remainingBefore)})`
@@ -180,6 +244,20 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       if (amount <= 0) {
         newErrors.amount = 'يجب أن يكون مبلغ الدفعة أكبر من صفر'
       }
+    }
+
+    if (isComprehensive && totalUnpaidBalance > 0) {
+      const finalAmount = amount + getTaxAmount() - getDiscountAmount()
+      if (finalAmount > totalUnpaidBalance) {
+        newErrors.amount = 'المبلغ المدخل يتجاوز إجمالي المبلغ المطلوب'
+      }
+      if (amount <= 0) {
+        newErrors.amount = 'يجب أن يكون مبلغ الدفعة أكبر من صفر'
+      }
+    }
+
+    if (isComprehensive && totalUnpaidBalance === 0) {
+      newErrors.amount = 'هذا المريض ليس لديه علاجات غير مدفوعة'
     }
 
     setErrors(newErrors)
@@ -196,6 +274,29 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       const discountAmount = getDiscountAmount()
       const taxAmount = getTaxAmount()
       const totalAmount = amount + taxAmount - discountAmount
+
+      // Handle comprehensive payment
+      if (isComprehensive) {
+        const result = await createComprehensivePayment(
+          formData.patient_id,
+          amount,
+          {
+            payment_method: formData.payment_method,
+            payment_date: formData.payment_date,
+            description: formData.description || 'دفعة شاملة',
+            receipt_number: formData.receipt_number || generateReceiptNumber(),
+            notes: formData.notes,
+            discount_amount: discountAmount,
+            tax_amount: taxAmount
+          }
+        )
+
+        toast({ title: 'تم بنجاح', description: result.message || 'تم تسجيل الدفعة الشاملة بنجاح' })
+        onOpenChange(false)
+        return
+      }
+
+      // Handle regular payment
       const totalAmountDue = getTotalAmountDue() || totalAmount
 
       const paymentData: Omit<Payment, 'id' | 'created_at' | 'updated_at'> = {
@@ -280,7 +381,17 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     return totalPaid < treatmentCost
   })
 
-  const selectedPatient = patients.find(p => p.id === formData.patient_id)
+  const comprehensivePatientOptions = patients
+    .filter(p => {
+      const remaining = patientRemainingBalances.get(p.id)
+      return remaining !== undefined && remaining > 0
+    })
+    .map(p => ({ value: p.id, label: p.full_name }))
+
+  const allPatientOptions = patients.map(p => ({ value: p.id, label: p.full_name }))
+
+  const patientOptions = isComprehensive ? comprehensivePatientOptions : allPatientOptions
+
   const selectedTreatment = toothTreatments.find(t => t.id === formData.tooth_treatment_id)
   const remainingBalance = getRemainingBalance()
   const isFullyPaid = getTotalAmountDue() > 0 && remainingBalance === 0
@@ -314,14 +425,14 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">المريض <span className="text-destructive">*</span></Label>
                   <Combobox
-                    options={patients.map(p => ({ value: p.id, label: p.full_name }))}
+                    options={patientOptions}
                     value={formData.patient_id}
                     onChange={(value) => {
                       setFormData(prev => ({ ...prev, patient_id: value, tooth_treatment_id: 'none' }))
                       if (errors.patient_id) setErrors(prev => ({ ...prev, patient_id: '' }))
                     }}
-                    placeholder="ابحث عن مريض..."
-                    emptyMessage="لا يوجد مرضى"
+                    placeholder={isComprehensive ? 'ابحث عن مريض لديه علاجات غير مدفوعة...' : 'ابحث عن مريض...'}
+                    emptyMessage={isComprehensive ? 'لا يوجد مرضى لديهم علاجات غير مدفوعة' : 'لا يوجد مرضى'}
                   />
                   {errors.patient_id && <p className="text-xs text-destructive">{errors.patient_id}</p>}
                 </div>
@@ -338,6 +449,15 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">بدون علاج</SelectItem>
+                      <SelectItem value="comprehensive">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-purple-500" />
+                          <span>دفعة شاملة</span>
+                          {unpaidTreatments.length > 0 && (
+                            <Badge variant="secondary" className="text-xs">{unpaidTreatments.length} علاج</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
                       {filteredToothTreatments.map(t => (
                         <SelectItem key={t.id} value={t.id}>
                           <span className="text-xs">السن {t.tooth_number} - {getTreatmentNameInArabic(t.treatment_type)}</span>
@@ -348,11 +468,40 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                 </div>
               </div>
 
-              {selectedTreatment && (
+              {/* Comprehensive Payment Info */}
+              {isComprehensive && unpaidTreatments.length > 0 && (
+                <div className="p-4 rounded-lg bg-purple-50 border border-purple-200 dark:bg-purple-950/30 dark:border-purple-800 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-purple-600" />
+                    <span className="text-sm font-semibold text-purple-800 dark:text-purple-200">دفعة شاملة</span>
+                    <Badge variant="outline" className="text-xs">{unpaidTreatments.length} علاج غير مدفوع</Badge>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">عدد العلاجات</p>
+                      <p className="text-lg font-bold text-purple-600">{unpaidTreatments.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">إجمالي المتبقي</p>
+                      <p className="text-lg font-bold text-orange-600">{formatAmount(totalUnpaidBalance)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">المبلغ المدفوع</p>
+                      <p className="text-lg font-bold text-green-600">{formatAmount(getCurrentAmount())}</p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-purple-700 dark:text-purple-300">
+                    سيتم توزيع المبلغ تلقائياً على العلاجات بدءاً من الأقل تكلفة
+                  </div>
+                </div>
+              )}
+
+              {/* Regular Treatment Info */}
+              {selectedTreatment && !isComprehensive && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
                   <Sparkles className="w-4 h-4 text-primary" />
                   <span className="text-xs text-muted-foreground">التكلفة:</span>
-                  <span className="text-sm font-bold text-primary">{formatAmount(selectedTreatment.cost)}</span>
+                  <span className="text-sm font-bold text-primary">{formatAmount(selectedTreatment.cost || 0)}</span>
                   {previousPayments > 0 && (
                     <>
                       <span className="text-xs text-muted-foreground">• مدفوع:</span>
@@ -379,9 +528,13 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                     type="number"
                     step="0.1"
                     min="0"
+                    max={isComprehensive && totalUnpaidBalance > 0 ? totalUnpaidBalance : undefined}
                     placeholder="0.00"
                     value={formData.amount}
-                    onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, amount: e.target.value }))
+                      if (errors.amount) setErrors(prev => ({ ...prev, amount: '' }))
+                    }}
                     onKeyDown={(e) => e.stopPropagation()}
                     className={`h-10 text-center font-bold ${errors.amount ? 'border-destructive' : ''}`}
                   />
@@ -592,8 +745,8 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading} className="flex-1">
             إلغاء
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isLoading} className="flex-1 bg-primary hover:bg-primary/90">
-            {isLoading ? 'جاري الحفظ...' : 'حفظ الدفعة'}
+          <Button type="submit" onClick={handleSubmit} disabled={isLoading || (isComprehensive && totalUnpaidBalance > 0 && (getCurrentAmount() + getTaxAmount() - getDiscountAmount()) > totalUnpaidBalance)} className="flex-1 bg-primary hover:bg-primary/90">
+            {isLoading ? 'جاري الحفظ...' : isComprehensive ? 'حفظ الدفعة الشاملة' : 'حفظ الدفعة'}
           </Button>
         </DialogFooter>
       </DialogContent>

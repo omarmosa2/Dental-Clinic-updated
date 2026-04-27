@@ -57,6 +57,10 @@ interface PaymentActions {
   markAsPending: (id: string) => Promise<void>
   markAsFailed: (id: string) => Promise<void>
   markAsRefunded: (id: string) => Promise<void>
+
+  // Comprehensive payment operations
+  createComprehensivePayment: (patientId: string, totalAmount: number, paymentData: any) => Promise<any>
+  getUnpaidTreatmentsForPatient: (patientId: string) => Promise<any[]>
 }
 
 type PaymentStore = PaymentState & PaymentActions
@@ -413,54 +417,60 @@ export const usePaymentStore = create<PaymentStore>()(
         const { payments } = get()
         let totalRemaining = 0
 
-        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالعلاجات (فقط من الدفعات الجزئية)
-        const treatmentPayments = payments.filter(p => p.tooth_treatment_id && p.status === 'partial')
-        const treatmentGroups: { [treatmentId: string]: Payment[] } = {}
+        // دالة مساعدة للتحقق من صحة المبالغ
+        const validateAmount = (amount: any): number => {
+          const num = Number(amount)
+          return isNaN(num) || !isFinite(num) ? 0 : Math.round(num * 100) / 100
+        }
+
+        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالعلاجات
+        const treatmentPayments = payments.filter(p => p.tooth_treatment_id)
+        const treatmentGroups: { [treatmentId: string]: { totalDue: number; totalPaid: number } } = {}
 
         treatmentPayments.forEach(payment => {
-          if (!treatmentGroups[payment.tooth_treatment_id!]) {
-            treatmentGroups[payment.tooth_treatment_id!] = []
+          const treatmentId = payment.tooth_treatment_id!
+          if (!treatmentGroups[treatmentId]) {
+            treatmentGroups[treatmentId] = { totalDue: 0, totalPaid: 0 }
           }
-          treatmentGroups[payment.tooth_treatment_id!].push(payment)
-        })
-
-        // حساب المتبقي لكل علاج (فقط من الدفعات الجزئية)
-        Object.keys(treatmentGroups).forEach(treatmentId => {
-          const treatmentPaymentsList = treatmentGroups[treatmentId]
-          // استخدام آخر دفعة للحصول على المعلومات المحدثة
-          const latestPayment = treatmentPaymentsList[treatmentPaymentsList.length - 1]
-          if (latestPayment.treatment_remaining_balance !== undefined) {
-            totalRemaining += latestPayment.treatment_remaining_balance
+          const group = treatmentGroups[treatmentId]
+          // استخدام التكلفة الإجمالية للعلاج كمرجع (جميع الدفعات لنفس العلاج لها نفس التكلفة)
+          group.totalDue = validateAmount(payment.treatment_total_cost || group.totalDue)
+          // جمع المبالغ المدفوعة من جميع الدفعات (المكتملة والجزئية)
+          if (payment.status === 'completed' || payment.status === 'partial') {
+            group.totalPaid += validateAmount(payment.amount)
           }
         })
 
-        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالمواعيد (فقط من الدفعات الجزئية)
-        const appointmentPayments = payments.filter(p => p.appointment_id && !p.tooth_treatment_id && p.status === 'partial')
-        const appointmentGroups: { [appointmentId: string]: Payment[] } = {}
+        Object.values(treatmentGroups).forEach(group => {
+          totalRemaining += Math.max(0, group.totalDue - group.totalPaid)
+        })
+
+        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالمواعيد
+        const appointmentPayments = payments.filter(p => p.appointment_id && !p.tooth_treatment_id)
+        const appointmentGroups: { [appointmentId: string]: { totalDue: number; totalPaid: number } } = {}
 
         appointmentPayments.forEach(payment => {
-          if (!appointmentGroups[payment.appointment_id!]) {
-            appointmentGroups[payment.appointment_id!] = []
+          const appointmentId = payment.appointment_id!
+          if (!appointmentGroups[appointmentId]) {
+            appointmentGroups[appointmentId] = { totalDue: 0, totalPaid: 0 }
           }
-          appointmentGroups[payment.appointment_id!].push(payment)
+          const group = appointmentGroups[appointmentId]
+          group.totalDue = validateAmount(payment.total_amount_due || group.totalDue)
+          if (payment.status === 'completed' || payment.status === 'partial') {
+            group.totalPaid += validateAmount(payment.amount)
+          }
         })
 
-        // حساب المتبقي لكل موعد (فقط من الدفعات الجزئية)
-        Object.keys(appointmentGroups).forEach(appointmentId => {
-          const appointmentPaymentsList = appointmentGroups[appointmentId]
-          // استخدام آخر دفعة للحصول على المعلومات المحدثة
-          const latestPayment = appointmentPaymentsList[appointmentPaymentsList.length - 1]
-          if (latestPayment.remaining_balance !== undefined) {
-            totalRemaining += latestPayment.remaining_balance
-          }
+        Object.values(appointmentGroups).forEach(group => {
+          totalRemaining += Math.max(0, group.totalDue - group.totalPaid)
         })
 
         // حساب المبلغ المتبقي من المدفوعات العامة (فقط من الدفعات الجزئية)
         const generalPayments = payments.filter(p => !p.appointment_id && !p.tooth_treatment_id && p.status === 'partial')
         generalPayments.forEach(payment => {
-          if (payment.remaining_balance !== undefined && payment.remaining_balance > 0) {
-            totalRemaining += payment.remaining_balance
-          }
+          const totalDue = validateAmount(payment.total_amount_due || payment.amount)
+          const paid = validateAmount(payment.amount_paid || payment.amount)
+          totalRemaining += Math.max(0, totalDue - paid)
         })
 
         set({ totalRemainingBalance: Math.round(totalRemaining * 100) / 100 })
@@ -616,6 +626,45 @@ export const usePaymentStore = create<PaymentStore>()(
 
       markAsRefunded: async (id) => {
         await get().updatePayment(id, { status: 'refunded' })
+      },
+
+      // Comprehensive payment operations
+      createComprehensivePayment: async (patientId, totalAmount, paymentData) => {
+        set({ isLoading: true, error: null })
+        try {
+          const result = await window.electronAPI.payments.createComprehensive(
+            patientId,
+            totalAmount,
+            paymentData
+          )
+
+          // Reload all payments to ensure consistency
+          await get().loadPayments()
+
+          // Emit events for real-time sync
+          if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('payment-changed', {
+              detail: { type: 'comprehensive_created', result }
+            }))
+          }
+
+          return result
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to create comprehensive payment',
+            isLoading: false
+          })
+          throw error
+        }
+      },
+
+      getUnpaidTreatmentsForPatient: async (patientId) => {
+        try {
+          return await window.electronAPI.payments.getUnpaidTreatments(patientId)
+        } catch (error) {
+          console.error('Failed to get unpaid treatments:', error)
+          return []
+        }
       }
       }
     },

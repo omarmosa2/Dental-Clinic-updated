@@ -25,7 +25,10 @@ import {
   ChevronsLeft,
   ChevronsRight,
   Eye,
-  DollarSign
+  DollarSign,
+  ChevronDown,
+  ChevronUp,
+  Layers
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
@@ -42,6 +45,18 @@ interface PaymentTableProps {
   onViewDetails: (payment: Payment) => void
 }
 
+interface ComprehensiveGroup {
+  batchId: string
+  payments: Payment[]
+  totalAmount: number
+  patientName: string
+  patientId: string
+  paymentDate: string
+  paymentMethod: string
+  overallStatus: 'completed' | 'partial'
+  receiptNumber: string
+}
+
 export default function PaymentTable({
   payments,
   patients,
@@ -55,82 +70,95 @@ export default function PaymentTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+  const [expandedBatches, setExpandedBatches] = useState<Set<string>>(new Set())
 
-  // Create a map of patient IDs to patient objects for quick lookup
-  const patientMap = useMemo(() => {
-    const map = new Map<string, Patient>()
-    patients.forEach(patient => {
-      map.set(patient.id, patient)
-    })
-    return map
-  }, [patients])
-
-  // Get patient name for a payment
   const getPatientName = (payment: Payment) => {
-    // First try to get patient from payment object (if loaded with JOIN)
     if (payment.patient?.full_name) {
       return payment.patient.full_name
     }
-    // Note: Patient interface uses full_name only
     return payment.patient?.full_name || 'مريض غير محدد'
-
-    // Fallback to patient map lookup
-    const patient = patientMap.get(payment.patient_id)
-    return patient?.full_name || 'مريض غير معروف'
   }
 
-  // Sort payments (filtering is now handled by the store)
-  const sortedPayments = useMemo(() => {
-    let sorted = [...payments]
+  const { groupedPayments, comprehensiveGroups } = useMemo(() => {
+    const groups: Map<string, ComprehensiveGroup> = new Map()
+    const regularPayments: Payment[] = []
 
-    // Sort payments
-    sorted.sort((a, b) => {
-      let aValue: any
-      let bValue: any
-
-      switch (sortField) {
-        case 'patient_name':
-          aValue = getPatientName(a)
-          bValue = getPatientName(b)
-          break
-        case 'payment_date':
-          aValue = new Date(a.payment_date)
-          bValue = new Date(b.payment_date)
-          break
-        case 'amount':
-          aValue = a.amount
-          bValue = b.amount
-          break
-        case 'payment_method':
-          aValue = a.payment_method
-          bValue = b.payment_method
-          break
-        case 'status':
-          aValue = a.status
-          bValue = b.status
-          break
-        case 'receipt_number':
-          aValue = a.receipt_number || ''
-          bValue = b.receipt_number || ''
-          break
-        default:
-          return 0
+    payments.forEach(payment => {
+      if (payment.is_comprehensive && payment.comprehensive_batch_id) {
+        const batchId = payment.comprehensive_batch_id
+        if (!groups.has(batchId)) {
+          groups.set(batchId, {
+            batchId,
+            payments: [],
+            totalAmount: 0,
+            patientName: getPatientName(payment),
+            patientId: payment.patient_id,
+            paymentDate: payment.payment_date,
+            paymentMethod: payment.payment_method,
+            overallStatus: 'completed',
+            receiptNumber: payment.receipt_number || ''
+          })
+        }
+        const group = groups.get(batchId)!
+        group.payments.push(payment)
+        group.totalAmount += payment.total_amount || payment.amount
+        if (payment.status === 'partial') {
+          group.overallStatus = 'partial'
+        }
+      } else {
+        regularPayments.push(payment)
       }
-
-      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
-      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
-      return 0
     })
 
-    return sorted
-  }, [payments, sortField, sortDirection, patientMap])
+    return {
+      comprehensiveGroups: Array.from(groups.values()),
+      groupedPayments: regularPayments
+    }
+  }, [payments])
 
-  // Pagination
-  const totalPages = Math.ceil(sortedPayments.length / pageSize)
+  const toggleBatch = (batchId: string) => {
+    setExpandedBatches(prev => {
+      const next = new Set(prev)
+      if (next.has(batchId)) {
+        next.delete(batchId)
+      } else {
+        next.add(batchId)
+      }
+      return next
+    })
+  }
+
+  const allItems = useMemo(() => {
+    const items: Array<{ type: 'regular'; payment: Payment } | { type: 'group-header'; group: ComprehensiveGroup } | { type: 'group-child'; payment: Payment; batchId: string }> = []
+
+    groupedPayments.forEach(payment => {
+      items.push({ type: 'regular', payment })
+    })
+
+    comprehensiveGroups.forEach(group => {
+      items.push({ type: 'group-header', group })
+      if (expandedBatches.has(group.batchId)) {
+        group.payments.forEach(payment => {
+          items.push({ type: 'group-child', payment, batchId: group.batchId })
+        })
+      }
+    })
+
+    items.sort((a, b) => {
+      const dateA = a.type === 'group-header' ? a.group.paymentDate : a.payment.payment_date
+      const dateB = b.type === 'group-header' ? b.group.paymentDate : b.payment.payment_date
+      const timeA = new Date(dateA).getTime()
+      const timeB = new Date(dateB).getTime()
+      return sortDirection === 'desc' ? timeB - timeA : timeA - timeB
+    })
+
+    return items
+  }, [groupedPayments, comprehensiveGroups, expandedBatches, sortDirection])
+
+  const totalPages = Math.ceil(allItems.length / pageSize)
   const startIndex = (currentPage - 1) * pageSize
-  const paginatedPayments = sortedPayments.slice(startIndex, startIndex + pageSize)
+  const paginatedItems = allItems.slice(startIndex, startIndex + pageSize)
 
-  // Handle sorting
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
@@ -140,7 +168,6 @@ export default function PaymentTable({
     }
   }
 
-  // Sortable header component
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <TableHead
       className="cursor-pointer hover:bg-muted/50 text-center"
@@ -157,7 +184,6 @@ export default function PaymentTable({
     </TableHead>
   )
 
-  // Get payment method label
   const getPaymentMethodLabel = (method: string) => {
     const methods = {
       cash: 'نقداً',
@@ -166,7 +192,6 @@ export default function PaymentTable({
     return methods[method as keyof typeof methods] || method
   }
 
-  // Get status badge
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       completed: { label: 'مكتمل', variant: 'default' as const },
@@ -209,7 +234,7 @@ export default function PaymentTable({
     )
   }
 
-  if (sortedPayments.length === 0) {
+  if (allItems.length === 0) {
     return (
       <div className="border rounded-lg">
         <Table className="table-center-all">
@@ -244,9 +269,10 @@ export default function PaymentTable({
     )
   }
 
+  let displayIndex = startIndex
+
   return (
     <div className="space-y-4" dir="rtl">
-      {/* Table */}
       <div className="border rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <Table className="table-center-all">
@@ -279,222 +305,351 @@ export default function PaymentTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedPayments.map((payment, index) => (
-                <TableRow key={payment.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium text-center">
-                    {startIndex + index + 1}
-                  </TableCell>
-                  <TableCell className="font-medium text-center">
-                    <div className="flex items-center justify-center gap-2">
-                      <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
-                        {getPatientName(payment).charAt(0)}
-                      </div>
-                      <span className="arabic-enhanced">{getPatientName(payment)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {payment.tooth_treatment_id ? (
-                      // عرض معلومات العلاج
-                      <div className="space-y-1">
-                        <div className="text-sm font-medium arabic-enhanced text-blue-600 dark:text-blue-400">
-                          السن {payment.tooth_treatment?.tooth_number}
+              {paginatedItems.map((item) => {
+                if (item.type === 'group-header') {
+                  const group = item.group
+                  const isExpanded = expandedBatches.has(group.batchId)
+                  displayIndex++
+                  return (
+                    <TableRow
+                      key={`group-${group.batchId}`}
+                      className=" dark:hover:bg-blue-950/30 dark:bg-blue-950/20 cursor-pointer"
+                      onClick={() => toggleBatch(group.batchId)}
+                    >
+                      <TableCell className="font-medium text-center">
+                        {displayIndex}
+                      </TableCell>
+                      <TableCell className="font-medium text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                            <Layers className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="arabic-enhanced font-semibold text-purple-700 dark:text-purple-300">{group.patientName}</span>
+                            <div className="text-xs text-muted-foreground arabic-enhanced">دفعة شاملة</div>
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {getTreatmentNameInArabic(payment.tooth_treatment?.treatment_type || '')}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm font-medium arabic-enhanced text-purple-600 dark:text-purple-400">
+                          {group.payments.length} علاج
                         </div>
-                        {payment.treatment_total_cost && (
-                          <div className="text-xs text-muted-foreground">
-                            تكلفة: {formatCurrency(payment.treatment_total_cost)}
-                          </div>
-                        )}
-                        {payment.treatment_remaining_balance !== undefined && payment.treatment_remaining_balance > 0 && (
-                          <div className="text-xs text-orange-600 dark:text-orange-400">
-                            متبقي: {formatCurrency(payment.treatment_remaining_balance)}
-                          </div>
-                        )}
-                      </div>
-                    ) : payment.appointment_id ? (
-                      // عرض معلومات الموعد (للتوافق مع النظام القديم)
-                      <div className="space-y-1">
-                        {(() => {
-                          // تحقق من وجود تاريخ الموعد
-                          const appointmentDate = payment.appointment?.start_time
-
-                          if (appointmentDate) {
-                            try {
-                              const date = new Date(appointmentDate)
-                              if (!isNaN(date.getTime())) {
-                                return (
-                                  <>
-                                    <div className="text-sm font-medium arabic-enhanced">
-                                      {date.toLocaleDateString('en-GB', {
-                                        year: 'numeric',
-                                        month: '2-digit',
-                                        day: '2-digit'
-                                      })}
-                                    </div>
-                                    <div className="text-xs text-muted-foreground">
-                                      {date.toLocaleTimeString('ar-SA', {
-                                        hour: '2-digit',
-                                        minute: '2-digit',
-                                        hour12: true
-                                      })}
-                                    </div>
-                                  </>
-                                )
-                              }
-                            } catch (error) {
-                              console.error('Error parsing appointment date:', error)
-                            }
-                          }
-
-                          // إذا لم يكن هناك تاريخ صحيح، اعرض "موعد محدد"
-                          return (
-                            <div className="text-sm font-medium arabic-enhanced">
-                              موعد محدد
-                            </div>
-                          )
-                        })()}
-
-                        {payment.total_amount_due && (
-                          <div className="text-xs text-muted-foreground">
-                            تكلفة: {formatCurrency(payment.total_amount_due)}
-                          </div>
-                        )}
-                        {payment.remaining_balance !== undefined && payment.remaining_balance > 0 && (
-                          <div className="text-xs text-orange-600 dark:text-orange-400">
-                            متبقي: {formatCurrency(payment.remaining_balance)}
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground arabic-enhanced">
-                        دفعة عامة
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="space-y-2">
-                      {/* إجمالي المبلغ المدفوع */}
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground arabic-enhanced">
-                          إجمالي المبلغ المدفوع:
-                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
                         <div className="font-medium text-lg text-green-600 dark:text-green-400">
+                          {formatCurrency(group.totalAmount)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="arabic-enhanced">
+                          {getPaymentMethodLabel(group.paymentMethod)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant={group.overallStatus === 'completed' ? 'default' : 'outline'} className="arabic-enhanced">
+                          {group.overallStatus === 'completed' ? 'مكتمل' : 'جزئي'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm arabic-enhanced">
+                          {formatDate(group.paymentDate)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              group.payments.forEach(payment => onDelete(payment))
+                            }}
+                            title="حذف الدفعة الشاملة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-purple-600"
+                          >
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                }
+
+                if (item.type === 'group-child') {
+                  const payment = item.payment
+                  return (
+                    <TableRow
+                      key={`child-${payment.id}`}
+                      className="bg-muted/30 hover:bg-muted/50 dark:bg-card/30 dark:hover:bg-card/50"
+                    >
+                      <TableCell className="text-center text-muted-foreground">
+                        <div className="flex items-center justify-center gap-1">
+                          <div className="w-2 h-2 bg-purple-400 rounded-full" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center text-muted-foreground arabic-enhanced">
+                        {getPatientName(payment)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium arabic-enhanced text-blue-600 dark:text-blue-400">
+                            السن {payment.tooth_treatment?.tooth_number}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {getTreatmentNameInArabic(payment.tooth_treatment?.treatment_type || '')}
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="font-medium text-green-600 dark:text-green-400">
                           {formatCurrency(payment.total_amount || payment.amount)}
                         </div>
-                      </div>
-                      
-                      {/* مبلغ الخصم */}
-                      <div className="space-y-1">
-                        <div className="text-xs text-muted-foreground arabic-enhanced">
-                          مبلغ الخصم:
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="arabic-enhanced">
+                          {getPaymentMethodLabel(payment.payment_method)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {getStatusBadge(payment.status)}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="text-sm arabic-enhanced">
+                          {formatDate(payment.payment_date)}
                         </div>
-                        <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                          {payment.discount_amount && payment.discount_amount > 0 
-                            ? formatCurrency(payment.discount_amount) 
-                            : 'لا يوجد خصم'
-                          }
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center space-x-1 space-x-reverse">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="action-btn-details text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                            onClick={(e) => { e.stopPropagation(); onViewDetails(payment) }}
+                            title="عرض التفاصيل"
+                          >
+                            <Eye className="w-4 h-4 ml-1" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="action-btn-receipt dark:text-foreground dark:hover:bg-muted"
+                            onClick={(e) => { e.stopPropagation(); onShowReceipt(payment) }}
+                          >
+                            <Printer className="w-4 h-4 ml-1" />
+                          </Button>
                         </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                }
+
+                const payment = item.payment
+                displayIndex++
+                return (
+                  <TableRow key={payment.id} className="hover:bg-muted/50 dark:bg-card/40 dark:hover:bg-card/60">
+                    <TableCell className="font-medium text-center">
+                      {displayIndex}
+                    </TableCell>
+                    <TableCell className="font-medium text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center text-primary-foreground text-sm font-medium">
+                          {getPatientName(payment).charAt(0)}
+                        </div>
+                        <span className="arabic-enhanced">{getPatientName(payment)}</span>
                       </div>
-                      
-                      {/* المبلغ المتبقي (فقط إذا كان موجوداً) */}
-                      {(() => {
-                        let remainingBalance = 0
-                        
-                        if (payment.tooth_treatment_id) {
-                          remainingBalance = payment.treatment_remaining_balance || 0
-                        } else if (payment.appointment_id) {
-                          remainingBalance = payment.remaining_balance || 0
-                        } else {
-                          const totalDue = payment.total_amount_due || 0
-                          const totalPaid = payment.amount || 0
-                          remainingBalance = Math.max(0, totalDue - totalPaid)
-                        }
-                        
-                        if (remainingBalance > 0) {
-                          return (
-                            <div className="space-y-1">
-                              <div className="text-xs text-muted-foreground arabic-enhanced">
-                                المبلغ المتبقي:
-                              </div>
-                              <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">
-                                {formatCurrency(remainingBalance)}
-                              </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {payment.tooth_treatment_id ? (
+                        <div className="space-y-1">
+                          <div className="text-sm font-medium arabic-enhanced text-blue-600 dark:text-blue-400">
+                            السن {payment.tooth_treatment?.tooth_number}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {getTreatmentNameInArabic(payment.tooth_treatment?.treatment_type || '')}
+                          </div>
+                          {payment.treatment_total_cost && (
+                            <div className="text-xs text-muted-foreground">
+                              تكلفة: {formatCurrency(payment.treatment_total_cost)}
                             </div>
-                          )
-                        }
-                        return null
-                      })()}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline" className="arabic-enhanced">
-                      {getPaymentMethodLabel(payment.payment_method)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {getStatusBadge(payment.status)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="text-sm arabic-enhanced">
-                      {formatDate(payment.payment_date)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-[220px] text-center">
-                    <div className="flex items-center justify-center space-x-1 space-x-reverse">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="action-btn-details text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        onClick={() => onViewDetails(payment)}
-                        title="عرض التفاصيل"
-                      >
-                        <Eye className="w-4 h-4 ml-1" />
-                        {/* <span className="text-xs arabic-enhanced">تفاصيل</span> */}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="action-btn-receipt"
-                        onClick={() => onShowReceipt(payment)}
-                      >
-                        <Printer className="w-4 h-4 ml-1" />
-                        {/* <span className="text-xs arabic-enhanced">إيصال</span> */}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="action-btn-edit"
-                        onClick={() => onEdit(payment)}
-                      >
-                        <Edit className="w-4 h-4 ml-1" />
-                        {/* <span className="text-xs arabic-enhanced">تعديل</span> */}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="action-btn-delete"
-                        onClick={() => onDelete(payment)}
-                      >
-                        <Trash2 className="w-4 h-4 ml-1" />
-                        {/* <span className="text-xs arabic-enhanced">حذف</span> */}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          )}
+                          {payment.treatment_remaining_balance !== undefined && payment.treatment_remaining_balance > 0 && (
+                            <div className="text-xs text-orange-600 dark:text-orange-400">
+                              متبقي: {formatCurrency(payment.treatment_remaining_balance)}
+                            </div>
+                          )}
+                        </div>
+                      ) : payment.appointment_id ? (
+                        <div className="space-y-1">
+                          {(() => {
+                            const appointmentDate = payment.appointment?.start_time
+                            if (appointmentDate) {
+                              try {
+                                const date = new Date(appointmentDate)
+                                if (!isNaN(date.getTime())) {
+                                  return (
+                                    <>
+                                      <div className="text-sm font-medium arabic-enhanced">
+                                        {date.toLocaleDateString('en-GB', {
+                                          year: 'numeric',
+                                          month: '2-digit',
+                                          day: '2-digit'
+                                        })}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground">
+                                        {date.toLocaleTimeString('ar-SA', {
+                                          hour: '2-digit',
+                                          minute: '2-digit',
+                                          hour12: true
+                                        })}
+                                      </div>
+                                    </>
+                                  )
+                                }
+                              } catch (error) {
+                                console.error('Error parsing appointment date:', error)
+                              }
+                            }
+                            return (
+                              <div className="text-sm font-medium arabic-enhanced">
+                                موعد محدد
+                              </div>
+                            )
+                          })()}
+                          {payment.total_amount_due && (
+                            <div className="text-xs text-muted-foreground">
+                              تكلفة: {formatCurrency(payment.total_amount_due)}
+                            </div>
+                          )}
+                          {payment.remaining_balance !== undefined && payment.remaining_balance > 0 && (
+                            <div className="text-xs text-orange-600 dark:text-orange-400">
+                              متبقي: {formatCurrency(payment.remaining_balance)}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-muted-foreground arabic-enhanced">
+                          دفعة عامة
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="space-y-2">
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground arabic-enhanced">
+                            إجمالي المبلغ المدفوع:
+                          </div>
+                          <div className="font-medium text-lg text-green-600 dark:text-green-400">
+                            {formatCurrency(payment.total_amount || payment.amount)}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-xs text-muted-foreground arabic-enhanced">
+                            مبلغ الخصم:
+                          </div>
+                          <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                            {payment.discount_amount && payment.discount_amount > 0
+                              ? formatCurrency(payment.discount_amount)
+                              : 'لا يوجد خصم'
+                            }
+                          </div>
+                        </div>
+                        {(() => {
+                          let remainingBalance = 0
+                          if (payment.tooth_treatment_id) {
+                            remainingBalance = payment.treatment_remaining_balance || 0
+                          } else if (payment.appointment_id) {
+                            remainingBalance = payment.remaining_balance || 0
+                          } else {
+                            const totalDue = payment.total_amount_due || 0
+                            const totalPaid = payment.amount || 0
+                            remainingBalance = Math.max(0, totalDue - totalPaid)
+                          }
+                          if (remainingBalance > 0) {
+                            return (
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground arabic-enhanced">
+                                  المبلغ المتبقي:
+                                </div>
+                                <div className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-2 py-1 rounded">
+                                  {formatCurrency(remainingBalance)}
+                                </div>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="arabic-enhanced">
+                        {getPaymentMethodLabel(payment.payment_method)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {getStatusBadge(payment.status)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="text-sm arabic-enhanced">
+                        {formatDate(payment.payment_date)}
+                      </div>
+                    </TableCell>
+                    <TableCell className="min-w-[220px] text-center">
+                      <div className="flex items-center justify-center space-x-1 space-x-reverse">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="action-btn-details text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                          onClick={() => onViewDetails(payment)}
+                          title="عرض التفاصيل"
+                        >
+                          <Eye className="w-4 h-4 ml-1" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="action-btn-receipt dark:text-foreground dark:hover:bg-muted"
+                          onClick={() => onShowReceipt(payment)}
+                        >
+                          <Printer className="w-4 h-4 ml-1" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="action-btn-edit dark:text-foreground dark:hover:bg-muted"
+                          onClick={() => onEdit(payment)}
+                        >
+                          <Edit className="w-4 h-4 ml-1" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="action-btn-delete dark:text-destructive dark:hover:bg-destructive/10"
+                          onClick={() => onDelete(payment)}
+                        >
+                          <Trash2 className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>
       </div>
 
-      {/* Pagination Controls */}
-      {sortedPayments.length > 0 && (
+      {allItems.length > 0 && (
         <div className="flex items-center justify-between px-2">
           <div className="flex items-center space-x-2 space-x-reverse">
             <p className="text-sm text-muted-foreground arabic-enhanced">
-              عرض {startIndex + 1} إلى {Math.min(startIndex + pageSize, sortedPayments.length)} من {sortedPayments.length} مدفوعة
+              عرض {startIndex + 1} إلى {Math.min(startIndex + pageSize, allItems.length)} من {allItems.length} مدفوعة
             </p>
           </div>
 

@@ -16,7 +16,10 @@ import {
   ReportData,
   ReportExportOptions,
   Lab,
-  LabOrder
+  LabOrder,
+  LabMonthlyBalance,
+  Medication,
+  Prescription
 } from './index'
 
 export interface ElectronAPI {
@@ -41,9 +44,15 @@ export interface ElectronAPI {
   // Payment operations
   payments: {
     getAll: () => Promise<Payment[]>
+    getByPatient: (patientId: string) => Promise<Payment[]>
+    getByToothTreatment: (toothTreatmentId: string) => Promise<Payment[]>
+    getToothTreatmentSummary: (toothTreatmentId: string) => Promise<any>
     create: (payment: Omit<Payment, 'id' | 'created_at' | 'updated_at'>) => Promise<Payment>
     update: (id: string, payment: Partial<Payment>) => Promise<Payment | null>
     delete: (id: string) => Promise<boolean>
+    search: (query: string) => Promise<Payment[]>
+    createComprehensive: (patientId: string, totalAmount: number, paymentData: any) => Promise<any>
+    getUnpaidTreatments: (patientId: string) => Promise<any[]>
   }
 
   // Treatment operations

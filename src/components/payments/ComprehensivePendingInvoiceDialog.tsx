@@ -448,7 +448,7 @@ ${invoiceSettings.discount_reason ? `💸 سبب الخصم: ${invoiceSettings.d
               remaining_balance: 0
             }
           } else {
-            // دفعة عامة
+            // دفعة شاملة
             amountToPay = originalPayment.total_amount_due || originalPayment.remaining_balance || item.amount || 0
             updateData = {
               ...updateData,

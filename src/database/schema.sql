@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS payments (
     total_amount_due DECIMAL(10,2), -- المبلغ الإجمالي المطلوب (للمدفوعات العامة)
     amount_paid DECIMAL(10,2), -- إجمالي المبلغ المدفوع (للمدفوعات العامة)
     remaining_balance DECIMAL(10,2), -- المبلغ المتبقي (للمدفوعات العامة)
+    -- حقل الدفعة الشاملة
+    is_comprehensive BOOLEAN DEFAULT 0, -- 1 إذا كانت دفعة شاملة توزع على عدة علاجات
+    comprehensive_batch_id TEXT, -- UUID مشترك لجميع الدفعات في نفس المجموعة الشاملة
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (patient_id) REFERENCES patients(id) ON DELETE CASCADE,
