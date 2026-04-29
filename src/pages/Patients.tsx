@@ -436,7 +436,7 @@ export default function Patients({ onNavigateToTreatments, onNavigateToPayments 
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent dir="rtl">
+        <AlertDialogContent dir="rtl" >
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-destructive" />

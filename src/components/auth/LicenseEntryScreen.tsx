@@ -166,7 +166,7 @@ export default function LicenseEntryScreen({
                 <button
                   type="button"
                   onClick={async () => {
-                    const whatsappUrl = `https://api.whatsapp.com/send/?phone=963959669628&text=مرحباً، أحتاج مساعدة في تفعيل ترخيص نظام إدارة العيادة السنية`;
+                    const whatsappUrl = `https://api.whatsapp.com/send/?phone=963940046997&text=مرحباً، أحتاج مساعدة في تفعيل ترخيص نظام إدارة العيادة السنية`;
 
                     // Try multiple methods to open external URL
                     try {

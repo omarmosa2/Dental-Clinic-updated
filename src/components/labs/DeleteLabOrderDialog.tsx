@@ -62,24 +62,24 @@ export default function DeleteLabOrderDialog({ open, onOpenChange, labOrder }: D
   const handleDelete = async () => {
     try {
       await deleteLabOrder(labOrder.id)
-      notify.success('تم حذف طلب المختبر بنجاح')
+      notify.success('تم حذف طلب المخبر بنجاح')
       onOpenChange(false)
     } catch (error) {
       console.error('Error deleting lab order:', error)
-      notify.error('فشل في حذف طلب المختبر')
+      notify.error('فشل في حذف طلب المخبر')
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md" dir="rtl">
-        <DialogHeader dir="rtl">
           <DialogTitle className="flex items-center gap-2 text-destructive text-right">
             <AlertTriangle className="h-5 w-5" />
-            تأكيد حذف طلب المختبر
+            تأكيد حذف طلب المخبر
           </DialogTitle>
+        <DialogHeader dir="rtl">
           <DialogDescription className="text-right">
-            هذا الإجراء لا يمكن التراجع عنه. سيتم حذف طلب المختبر نهائياً من النظام.
+            هذا الإجراء لا يمكن التراجع عنه. سيتم حذف طلب المخبر نهائياً من النظام.
           </DialogDescription>
         </DialogHeader>
 
@@ -88,7 +88,7 @@ export default function DeleteLabOrderDialog({ open, onOpenChange, labOrder }: D
           <div className="bg-muted/50 rounded-lg p-4 space-y-3">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" />
-              <span className="font-semibold">المختبر:</span>
+              <span className="font-semibold">المخبر:</span>
               <span>{labOrder.lab?.name || 'غير محدد'}</span>
             </div>
 
@@ -166,7 +166,7 @@ export default function DeleteLabOrderDialog({ open, onOpenChange, labOrder }: D
           {/* Confirmation Message */}
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-sm text-red-800 dark:text-red-200">
-              <strong>هل أنت متأكد من رغبتك في حذف طلب المختبر هذا؟</strong>
+              <strong>هل أنت متأكد من رغبتك في حذف طلب المخبر هذا؟</strong>
               <span className="block mt-1">
                 سيتم حذف جميع المعلومات المرتبطة بهذا الطلب نهائياً.
               </span>

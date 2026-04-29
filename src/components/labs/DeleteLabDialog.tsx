@@ -33,24 +33,24 @@ export default function DeleteLabDialog({ open, onOpenChange, lab }: DeleteLabDi
   const handleDelete = async () => {
     try {
       await deleteLab(lab.id)
-      notify.success(`تم حذف المختبر "${lab.name}" بنجاح`)
+      notify.success(`تم حذف المخبر "${lab.name}" بنجاح`)
       onOpenChange(false)
     } catch (error) {
       console.error('Error deleting lab:', error)
-      notify.error('فشل في حذف المختبر')
+      notify.error('فشل في حذف المخبر')
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md" dir="rtl">
-        <DialogHeader dir="rtl">
           <DialogTitle className="flex items-center gap-2 text-destructive text-right">
             <AlertTriangle className="h-5 w-5" />
-            تأكيد حذف المختبر
+            تأكيد حذف المخبر
           </DialogTitle>
+        <DialogHeader dir="rtl">
           <DialogDescription className="text-right">
-            هذا الإجراء لا يمكن التراجع عنه. سيتم حذف المختبر نهائياً من النظام.
+            هذا الإجراء لا يمكن التراجع عنه. سيتم حذف المخبر نهائياً من النظام.
           </DialogDescription>
         </DialogHeader>
 
@@ -59,7 +59,7 @@ export default function DeleteLabDialog({ open, onOpenChange, lab }: DeleteLabDi
           <div className="bg-muted/50 rounded-lg p-4 space-y-2">
             <div className="flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" />
-              <span className="font-semibold">اسم المختبر:</span>
+              <span className="font-semibold">اسم المخبر:</span>
               <span>{lab.name}</span>
             </div>
 
@@ -86,7 +86,7 @@ export default function DeleteLabDialog({ open, onOpenChange, lab }: DeleteLabDi
                 <span className="font-semibold">تحذير مهم</span>
               </div>
               <p className="text-sm text-destructive mb-3">
-                هذا المختبر يحتوي على طلبات مرتبطة به. حذف المختبر سيؤدي إلى حذف جميع الطلبات المرتبطة به أيضاً.
+                هذا المخبر يحتوي على طلبات مرتبطة به. حذف المخبر سيؤدي إلى حذف جميع الطلبات المرتبطة به أيضاً.
               </p>
               <div className="flex items-center gap-2">
                 <Microscope className="h-4 w-4 text-destructive" />
@@ -101,10 +101,10 @@ export default function DeleteLabDialog({ open, onOpenChange, lab }: DeleteLabDi
           {/* Confirmation Message */}
           <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
             <p className="text-sm text-yellow-800 dark:text-yellow-200">
-              <strong>هل أنت متأكد من رغبتك في حذف هذا المختبر؟</strong>
+              <strong>هل أنت متأكد من رغبتك في حذف هذا المخبر؟</strong>
               {hasOrders && (
                 <span className="block mt-1">
-                  سيتم حذف جميع الطلبات المرتبطة بهذا المختبر ({labOrders.length} طلب).
+                  سيتم حذف جميع الطلبات المرتبطة بهذا المخبر ({labOrders.length} طلب).
                 </span>
               )}
             </p>

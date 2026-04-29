@@ -52,11 +52,11 @@ const DeleteClinicNeedDialog: React.FC<DeleteClinicNeedDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm" className="overflow-y-auto max-h-[90vh]" dir="rtl">
-        <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-red-600">
             <AlertTriangle className="w-5 h-5" />
             تأكيد الحذف
           </DialogTitle>
+        <DialogHeader>
           <DialogDescription>
             هل أنت متأكد من حذف هذا الاحتياج؟ لا يمكن التراجع عن هذا الإجراء.
           </DialogDescription>

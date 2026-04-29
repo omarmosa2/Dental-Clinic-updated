@@ -79,11 +79,11 @@ const DeleteExpenseDialog: React.FC<DeleteExpenseDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md" dir="rtl">
-        <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive">
             <AlertTriangle className="w-5 h-5" />
             تأكيد حذف المصروف
           </DialogTitle>
+        <DialogHeader>
           <DialogDescription>
             هل أنت متأكد من حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء.
           </DialogDescription>

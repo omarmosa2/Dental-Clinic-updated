@@ -111,19 +111,6 @@ export default function PaymentDetailsDialog({
             عرض تفاصيل شاملة للدفعة رقم {payment.receipt_number || payment.id.slice(-6)}
           </DialogDescription>
         </DialogHeader>
-
-        {/* Debug info for discount troubleshooting */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 mb-4">
-            <div className="text-xs text-yellow-800 dark:text-yellow-200 font-mono">
-              <div>DEBUG - Discount Amount: {JSON.stringify(payment.discount_amount)}</div>
-              <div>DEBUG - Tax Amount: {JSON.stringify(payment.tax_amount)}</div>
-              <div>DEBUG - Total Amount: {JSON.stringify(payment.total_amount)}</div>
-              <div>DEBUG - Amount: {JSON.stringify(payment.amount)}</div>
-            </div>
-          </div>
-        )}
-
         <div className="space-y-6">
           {/* معلومات أساسية */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -201,7 +188,7 @@ export default function PaymentDetailsDialog({
             <CardContent>
               <div className="space-y-4">
                 {/* إجمالي المبلغ المدفوع */}
-                <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
+                <div className="text-center p-4  dark:bg-green-950/30 rounded-lg border border-green-200 dark:border-green-800">
                   <div className="text-xs text-muted-foreground arabic-enhanced mb-1">
                     إجمالي المبلغ المدفوع:
                   </div>

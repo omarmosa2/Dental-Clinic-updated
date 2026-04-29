@@ -469,7 +469,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
               </div>
 
               {/* Comprehensive Payment Info */}
-              {isComprehensive && unpaidTreatments.length > 0 && (
+              {/* {isComprehensive && unpaidTreatments.length > 0 && (
                 <div className="p-4 rounded-lg bg-purple-50 border border-purple-200 dark:bg-purple-950/30 dark:border-purple-800 space-y-3">
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4 text-purple-600" />
@@ -490,13 +490,14 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       <p className="text-lg font-bold text-green-600">{formatAmount(getCurrentAmount())}</p>
                     </div>
                   </div>
-                  <div className="text-xs text-purple-700 dark:text-purple-300">
-                    سيتم توزيع المبلغ تلقائياً على العلاجات بدءاً من الأقل تكلفة
-                  </div>
+                  
                 </div>
-              )}
+              )} */}
 
               {/* Regular Treatment Info */}
+              <div className="text-xs text-purple-700 dark:text-purple-300">
+                    سيتم توزيع المبلغ تلقائياً على العلاجات بدءاً من الأقل تكلفة
+                  </div>
               {selectedTreatment && !isComprehensive && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
                   <Sparkles className="w-4 h-4 text-primary" />
