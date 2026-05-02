@@ -10,7 +10,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (patient) => ipcRenderer.invoke('db:patients:create', patient),
     update: (id, patient) => ipcRenderer.invoke('db:patients:update', id, patient),
     delete: (id) => ipcRenderer.invoke('db:patients:delete', id),
-    search: (query) => ipcRenderer.invoke('db:patients:search', query)
+    search: (query) => ipcRenderer.invoke('db:patients:search', query),
+    getLastPatientNumber: () => ipcRenderer.invoke('db:patients:getLastPatientNumber')
   },
 
   // Appointment operations

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import {
   Dialog,
@@ -43,9 +43,15 @@ interface PatientFormData {
 }
 
 export default function AddPatientDialog({ open, onOpenChange }: AddPatientDialogProps) {
-  const { createPatient, isLoading, patients } = usePatientStore()
+  const { createPatient, isLoading, patients, lastPatientNumber, fetchLastPatientNumber } = usePatientStore()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      fetchLastPatientNumber()
+    }
+  }, [open, fetchLastPatientNumber])
 
   const {
     register,
@@ -278,6 +284,11 @@ export default function AddPatientDialog({ open, onOpenChange }: AddPatientDialo
                 <p className="text-xs text-muted-foreground">
                   رقم تعريفي للمريض (اختياري، يقبل الأعداد الصحيحة الموجبة فقط)
                 </p>
+                {lastPatientNumber !== null && (
+                  <p className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                    آخر رقم مريض تم الوصول له: {lastPatientNumber}
+                  </p>
+                )}
                 {errors.patient_number && (
                   <p className="text-sm text-destructive">{errors.patient_number.message}</p>
                 )}

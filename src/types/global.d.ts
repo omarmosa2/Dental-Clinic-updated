@@ -8,6 +8,7 @@ declare global {
         update: (id: string, patient: any) => Promise<any>
         delete: (id: string) => Promise<boolean>
         search: (query: string) => Promise<any[]>
+        getLastPatientNumber: () => Promise<number | null>
       }
       appointments: {
         getAll: () => Promise<any[]>

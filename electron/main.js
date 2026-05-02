@@ -795,6 +795,18 @@ ipcMain.handle('db:patients:delete', async (_, id) => {
   }
 })
 
+ipcMain.handle('db:patients:getLastPatientNumber', async () => {
+  try {
+    if (databaseService) {
+      return await databaseService.getLastPatientNumber()
+    }
+    return null
+  } catch (error) {
+    console.error('Error getting last patient number:', error)
+    return null
+  }
+})
+
 ipcMain.handle('db:patients:search', async (_, query) => {
   try {
     if (databaseService) {

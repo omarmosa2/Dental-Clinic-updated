@@ -31,6 +31,7 @@ export interface ElectronAPI {
     update: (id: string, patient: Partial<Patient>) => Promise<Patient | null>
     delete: (id: string) => Promise<boolean>
     search: (query: string) => Promise<Patient[]>
+    getLastPatientNumber: () => Promise<number | null>
   }
 
   // Appointment operations

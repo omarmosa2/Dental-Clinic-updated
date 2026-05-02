@@ -11,6 +11,7 @@ interface PatientState {
   searchQuery: string
   patientNumberSearchQuery: string
   filteredPatients: Patient[]
+  lastPatientNumber: number | null
 }
 
 interface PatientActions {
@@ -29,6 +30,9 @@ interface PatientActions {
   // Search and filter
   searchPatients: (query: string) => Promise<void>
   filterPatients: () => void
+
+  // Patient number
+  fetchLastPatientNumber: () => Promise<void>
 
   // Patient-related data
   getPatientAppointments: (patientId: string) => Promise<any[]>
@@ -56,6 +60,7 @@ export const usePatientStore = create<PatientStore>()(
       searchQuery: '',
       patientNumberSearchQuery: '',
       filteredPatients: [],
+      lastPatientNumber: null,
 
       // Data operations
       loadPatients: async () => {
@@ -318,6 +323,17 @@ export const usePatientStore = create<PatientStore>()(
         })
 
         set({ filteredPatients: filtered })
+      },
+
+      // Patient number
+      fetchLastPatientNumber: async () => {
+        try {
+          const lastNumber = await window.electronAPI?.patients?.getLastPatientNumber?.()
+          set({ lastPatientNumber: lastNumber ?? null })
+        } catch (error) {
+          console.error('Error fetching last patient number:', error)
+          set({ lastPatientNumber: null })
+        }
       },
 
       // Patient-related data methods

@@ -1226,6 +1226,16 @@ class DatabaseService {
     return stmt.get(id)
   }
 
+  async getLastPatientNumber() {
+    this.ensureConnection()
+
+    const stmt = this.db.prepare(`
+      SELECT MAX(patient_number) as lastNumber FROM patients WHERE patient_number IS NOT NULL
+    `)
+    const result = stmt.get()
+    return result?.lastNumber ?? null
+  }
+
   async createPatient(patient) {
     // Ensure date_added column exists before creating
     this.ensureDateAddedColumn()

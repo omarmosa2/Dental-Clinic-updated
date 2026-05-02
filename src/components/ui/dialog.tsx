@@ -54,7 +54,7 @@ const DialogContent = React.forwardRef<
         dir="rtl"
         className={cn(
           "fixed left-[50%] top-[50%] z-50 grid w-full translate-x-[-50%] translate-y-[-50%] gap-3 sm:gap-4",
-          "border border-border bg-background",
+          "border border-border bg-white",
           "p-4 sm:p-6",
           "shadow-lg",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
@@ -65,6 +65,7 @@ const DialogContent = React.forwardRef<
           "rounded-xl",
           "max-h-[90vh] sm:max-h-[85vh]",
           "overflow-hidden",
+          "dark:bg-zinc-900 dark:border-zinc-700",
           sizeClasses[size],
           className
         )}
