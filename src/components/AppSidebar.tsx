@@ -69,6 +69,12 @@ const navigationItems = [
     url: "labs",
     icon: Microscope,
   },
+  
+    {
+      title: "طلبات المستودعات",
+      url: "clinic-needs",
+      icon: ClipboardList,
+    },
   {
     title: "المخزون",
     url: "inventory",
@@ -79,12 +85,6 @@ const navigationItems = [
     title: "الأدوية والوصفات",
     url: "medications",
     icon: Pill,
-  },
-
-  {
-    title: "طلبات المستودعات",
-    url: "clinic-needs",
-    icon: ClipboardList,
   },
   {
     title: "مصروفات العيادة",

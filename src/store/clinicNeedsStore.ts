@@ -3,9 +3,7 @@ import { devtools } from 'zustand/middleware'
 import type { ClinicNeed } from '../types'
 
 interface ClinicNeedsFilters {
-  category?: string
-  priority?: string
-  status?: string
+  supplier?: string
 }
 
 interface ClinicNeedsState {
@@ -241,22 +239,13 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
             need.need_name.toLowerCase().includes(query) ||
             need.serial_number.toLowerCase().includes(query) ||
             need.description?.toLowerCase().includes(query) ||
-            need.category?.toLowerCase().includes(query) ||
             need.supplier?.toLowerCase().includes(query)
           )
         }
 
-        // Apply filters
-        if (filters.category) {
-          filtered = filtered.filter(need => need.category === filters.category)
-        }
-
-        if (filters.priority) {
-          filtered = filtered.filter(need => need.priority === filters.priority)
-        }
-
-        if (filters.status) {
-          filtered = filtered.filter(need => need.status === filters.status)
+        // Apply supplier filter
+        if (filters.supplier) {
+          filtered = filtered.filter(need => need.supplier === filters.supplier)
         }
 
         set({ filteredNeeds: filtered })

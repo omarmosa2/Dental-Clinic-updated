@@ -84,18 +84,8 @@ const ClinicNeeds: React.FC = () => {
 
   const handleMarkAsReceived = async (need: ClinicNeed) => {
     try {
-      // تحديث حالة الاحتياج إلى "مستلم" مع الاحتفاظ بجميع البيانات الأخرى
-      const updatedData = {
-        serial_number: need.serial_number,
-        need_name: need.need_name,
-        quantity: need.quantity,
-        price: need.price,
-        description: need.description,
-        category: need.category,
-        priority: need.priority,
-        status: 'received',
-        supplier: need.supplier,
-        notes: need.notes
+      const updatedData: Partial<ClinicNeed> = {
+        status: 'received'
       }
 
       await updateNeed(need.id, updatedData)
@@ -240,7 +230,6 @@ const ClinicNeeds: React.FC = () => {
         onSearchChange={setSearchQuery}
         filters={filters}
         onFilterChange={handleFilterChange}
-        categories={categories}
         suppliers={suppliers}
         onClearFilters={handleClearFilters}
       />
