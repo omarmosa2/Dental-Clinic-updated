@@ -160,13 +160,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
       <DialogContent size="lg" className="overflow-y-auto max-h-[90vh]" dir="rtl">
         <DialogHeader>
           <DialogTitle>
-            {editingNeed ? 'تعديل الاحتياج' : 'إضافة احتياج جديد'}
+            {editingNeed ? 'تعديل الطلب' : 'طلب من مستودع الأسنان'}
           </DialogTitle>
           <DialogDescription>
-            {editingNeed
-              ? 'قم بتعديل بيانات الاحتياج'
-              : 'أدخل بيانات الاحتياج الجديد للعيادة'
-            }
+           
           </DialogDescription>
         </DialogHeader>
 
@@ -232,7 +229,7 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="category">الفئة</Label>
               <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
@@ -271,10 +268,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
                 </SelectContent>
               </Select>
             </div>
-          </div>
+          </div> */}
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label htmlFor="status">الحالة</Label>
               <Select value={formData.status} onValueChange={(value) => handleInputChange('status', value)}>
                 <SelectTrigger>
@@ -287,10 +284,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
                   <SelectItem value="cancelled">ملغي</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
 
             <div className="space-y-2">
-              <Label htmlFor="supplier">المورد</Label>
+              <Label htmlFor="supplier">مستودع المواد السنية</Label>
               <Input
                 id="supplier"
                 value={formData.supplier}
@@ -311,7 +308,7 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
             />
           </div>
 
-          <div className="space-y-2">
+          {/* <div className="space-y-2">
             <Label htmlFor="notes">ملاحظات</Label>
             <Textarea
               id="notes"
@@ -320,7 +317,7 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
               placeholder="ملاحظات إضافية (اختياري)"
               rows={2}
             />
-          </div>
+          </div> */}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

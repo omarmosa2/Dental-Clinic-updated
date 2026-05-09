@@ -136,8 +136,6 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
             <TableHead className="text-right">الكمية</TableHead>
             <TableHead className="text-right">السعر</TableHead>
             <TableHead className="text-right">الإجمالي</TableHead>
-            <TableHead className="text-right">الفئة</TableHead>
-            <TableHead className="text-right">الأولوية</TableHead>
             <TableHead className="text-right">الحالة</TableHead>
             <TableHead className="text-right">المورد</TableHead>
             <TableHead className="text-right">الإجراءات</TableHead>
@@ -177,17 +175,17 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
                 </span>
               </TableCell>
 
-              <TableCell>
+              {/* <TableCell>
                 {need.category && (
                   <Badge variant="outline" className="w-fit">
                     {need.category}
                   </Badge>
                 )}
-              </TableCell>
+              </TableCell> */}
 
-              <TableCell>
+              {/* <TableCell>
                 {getPriorityBadge(need.priority)}
-              </TableCell>
+              </TableCell> */}
 
               <TableCell>
                 {getStatusBadge(need.status)}

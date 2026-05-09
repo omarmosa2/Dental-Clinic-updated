@@ -378,7 +378,7 @@ function AppContent() {
       labs: 'المخابر',
       medications: 'الأدوية والوصفات',
       'dental-treatments': 'العلاجات السنية',
-      'clinic-needs': 'احتياجات العيادة',
+      'clinic-needs': 'طلبات المستودعات',
       'expenses': 'مصروفات العيادة',
       reports: 'التقارير',
       'external-estimate': 'فاتورة تقديرية خارجية',

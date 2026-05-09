@@ -82,7 +82,7 @@ const navigationItems = [
   },
 
   {
-    title: "احتياجات العيادة",
+    title: "طلبات المستودعات",
     url: "clinic-needs",
     icon: ClipboardList,
   },

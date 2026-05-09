@@ -168,10 +168,10 @@ const ClinicNeeds: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
             <ClipboardList className="w-8 h-8 text-primary" />
-            احتياجات العيادة
+            المواد السنية 
           </h1>
           <p className="text-muted-foreground mt-1">
-            إدارة احتياجات ومتطلبات العيادة
+            المواد السنية  
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -201,7 +201,7 @@ const ClinicNeeds: React.FC = () => {
           </Button>
           <Button onClick={handleAddNew} className="btn-modern btn-modern-primary flex items-center gap-2">
             <Plus className="w-4 h-4" />
-            إضافة احتياج جديد
+            إضافة طلب جديد
           </Button>
         </div>
       </div>
@@ -248,10 +248,7 @@ const ClinicNeeds: React.FC = () => {
       {/* Needs List */}
       <Card>
         <CardHeader>
-          <CardTitle>قائمة الاحتياجات</CardTitle>
-          <CardDescription>
-            عرض جميع احتياجات العيادة مع إمكانية التعديل والحذف
-          </CardDescription>
+          <CardTitle>قائمة المواد السنية</CardTitle>
         </CardHeader>
         <CardContent>
           <ClinicNeedsTable
