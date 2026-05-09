@@ -71,8 +71,8 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
   const getPaymentStatusBadge = (need: ClinicNeed) => {
     const status = getClinicNeedPaymentStatus(need)
     const statusConfig = {
-      paid: { variant: 'default' as const, icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-      partial: { variant: 'default' as const, icon: Clock, className: 'bg-amber-100 text-amber-800 hover:bg-amber-100' },
+      paid: { variant: 'default' as const, icon: CheckCircle, className: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/40' },
+      partial: { variant: 'default' as const, icon: Clock, className: 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40' },
       unpaid: { variant: 'destructive' as const, icon: XCircle, className: '' }
     }
 
@@ -175,11 +175,11 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
               </TableCell> */}
 
               <TableCell>
-                <span className="font-semibold text-green-600">{formatCurrency(paid)}</span>
+                <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(paid)}</span>
               </TableCell>
 
               <TableCell>
-                <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                <span className={`font-semibold ${remaining > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-green-600 dark:text-green-400'}`}>
                   {formatCurrency(remaining)}
                 </span>
               </TableCell>
@@ -208,7 +208,7 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
                     variant="ghost"
                     size="sm"
                     onClick={() => onDelete(need)}
-                    className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="h-8 w-8 p-0 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/30"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

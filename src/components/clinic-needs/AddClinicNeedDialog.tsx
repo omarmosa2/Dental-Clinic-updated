@@ -175,10 +175,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
               value={formData.need_name}
               onChange={(e) => handleInputChange('need_name', e.target.value)}
               placeholder="أدخل اسم الاحتياج"
-              className={errors.need_name ? 'border-red-500' : ''}
+              className={errors.need_name ? 'border-red-500 dark:border-red-400' : ''}
             />
             {errors.need_name && (
-              <p className="text-sm text-red-500">{errors.need_name}</p>
+              <p className="text-sm text-red-500 dark:text-red-400">{errors.need_name}</p>
             )}
           </div>
 
@@ -198,10 +198,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
                   const value = parseInt(e.target.value) || 1
                   handleInputChange('quantity', value)
                 }}
-                className={errors.quantity ? 'border-red-500' : ''}
+                className={errors.quantity ? 'border-red-500 dark:border-red-400' : ''}
               />
               {errors.quantity && (
-                <p className="text-sm text-red-500">{errors.quantity}</p>
+                <p className="text-sm text-red-500 dark:text-red-400">{errors.quantity}</p>
               )}
             </div>
 
@@ -221,10 +221,10 @@ const AddClinicNeedDialog: React.FC<AddClinicNeedDialogProps> = ({
                   const value = parseFloat(e.target.value) || 0
                   handleInputChange('price', value)
                 }}
-                className={errors.price ? 'border-red-500' : ''}
+                className={errors.price ? 'border-red-500 dark:border-red-400' : ''}
               />
               {errors.price && (
-                <p className="text-sm text-red-500">{errors.price}</p>
+                <p className="text-sm text-red-500 dark:text-red-400">{errors.price}</p>
               )}
             </div>
           </div>

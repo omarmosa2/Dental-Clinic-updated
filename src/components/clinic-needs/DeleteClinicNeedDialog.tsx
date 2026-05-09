@@ -52,7 +52,7 @@ const DeleteClinicNeedDialog: React.FC<DeleteClinicNeedDialogProps> = ({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm" className="overflow-y-auto max-h-[90vh]" dir="rtl">
-          <DialogTitle className="flex items-center gap-2 text-red-600">
+          <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
             <AlertTriangle className="w-5 h-5" />
             تأكيد الحذف
           </DialogTitle>
@@ -63,7 +63,7 @@ const DeleteClinicNeedDialog: React.FC<DeleteClinicNeedDialogProps> = ({
         </DialogHeader>
 
         <div className="py-4">
-          <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="bg-muted/50 dark:bg-muted/30 rounded-lg p-4 space-y-2">
             <div className="flex justify-between">
               <span className="font-medium">#:</span>
               <span>{need.serial_number}</span>

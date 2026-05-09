@@ -112,12 +112,12 @@ const ClinicNeedsFilters: React.FC<ClinicNeedsFiltersProps> = ({
                 </span>
               )}
               {filters.supplier && filters.supplier !== 'all' && (
-                <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2 text-xs">
+                <span className="inline-block bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded mr-2 text-xs">
                   المستودع: {filters.supplier}
                 </span>
               )}
               {filters.paymentStatus && (
-                <span className="inline-block bg-amber-100 text-amber-800 px-2 py-1 rounded mr-2 text-xs">
+                <span className="inline-block bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 px-2 py-1 rounded mr-2 text-xs">
                   حالة الدفع: {
                     filters.paymentStatus === 'paid'
                       ? 'مدفوع'

@@ -201,11 +201,11 @@ const SupplierPaymentDialog: React.FC<SupplierPaymentDialogProps> = ({
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">المدفوع</p>
-                <p className="text-lg font-bold text-green-600">{formatCurrency(selectedSummary.paid)}</p>
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(selectedSummary.paid)}</p>
               </div>
               <div className="rounded-lg border p-3">
                 <p className="text-xs text-muted-foreground">الدين المتبقي</p>
-                <p className="text-lg font-bold text-orange-600">{formatCurrency(selectedSummary.remaining)}</p>
+                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(selectedSummary.remaining)}</p>
               </div>
             </div>
           )}
@@ -213,7 +213,7 @@ const SupplierPaymentDialog: React.FC<SupplierPaymentDialogProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="paymentAmount" className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-green-600" />
+                <Wallet className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <span>قيمة الدفعة *</span>
               </Label>
               <Input
@@ -286,7 +286,7 @@ const SupplierPaymentDialog: React.FC<SupplierPaymentDialogProps> = ({
                         المتبقي قبل الدفع: {formatCurrency(item.remaining)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2 text-green-600 font-semibold">
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 font-semibold">
                       <span>{formatCurrency(item.applied)}</span>
                       {item.willBeFullyPaid && <CheckCircle className="h-4 w-4" />}
                     </div>
@@ -297,14 +297,14 @@ const SupplierPaymentDialog: React.FC<SupplierPaymentDialogProps> = ({
           )}
 
           {selectedSupplier && payableNeeds.length === 0 && (
-            <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-green-800 flex items-center gap-2">
+            <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 text-green-800 dark:text-green-300 flex items-center gap-2">
               <CheckCircle className="h-4 w-4" />
               <span className="text-sm">جميع طلبات هذا المستودع مدفوعة بالكامل.</span>
             </div>
           )}
 
           {!selectedSupplier && supplierOptions.length === 0 && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 flex items-center gap-2">
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-3 text-amber-800 dark:text-amber-300 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               <span className="text-sm">لا توجد مستودعات مسجلة داخل الطلبات الحالية.</span>
             </div>
