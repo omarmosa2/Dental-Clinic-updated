@@ -388,6 +388,8 @@ export const TREATMENT_COLORS = {
 
 export type TreatmentColorKey = keyof typeof TREATMENT_COLORS
 
+export type ClinicNeedPaymentStatus = 'paid' | 'partial' | 'unpaid'
+
 // Clinic Need interface
 export interface ClinicNeed {
   id: string
@@ -401,8 +403,46 @@ export interface ClinicNeed {
   status: 'pending' | 'ordered' | 'received' | 'cancelled'
   supplier?: string
   notes?: string
+  paid_amount?: number
+  remaining_balance?: number
+  payment_status?: ClinicNeedPaymentStatus
+  last_payment_date?: string
   created_at: string
   updated_at: string
+}
+
+export interface ClinicNeedSupplierPaymentInput {
+  supplier: string
+  amount: number
+  payment_date: string
+  notes?: string
+}
+
+export interface ClinicNeedPaymentAllocation {
+  clinic_need_id: string
+  need_name: string
+  previous_paid_amount: number
+  previous_remaining_balance: number
+  applied_amount: number
+  new_paid_amount: number
+  new_remaining_balance: number
+  payment_status: ClinicNeedPaymentStatus
+}
+
+export interface ClinicNeedSupplierPaymentResult {
+  payment: {
+    id: string
+    supplier: string
+    amount: number
+    payment_date: string
+    notes?: string
+    created_at: string
+  }
+  allocations: ClinicNeedPaymentAllocation[]
+  updated_needs: ClinicNeed[]
+  total_applied: number
+  supplier_total_remaining: number
+  supplier_total_paid: number
 }
 
 // Clinic Expense interface for operational expenses

@@ -19,7 +19,9 @@ import {
   LabOrder,
   LabMonthlyBalance,
   Medication,
-  Prescription
+  Prescription,
+  ClinicNeedSupplierPaymentInput,
+  ClinicNeedSupplierPaymentResult
 } from './index'
 
 export interface ElectronAPI {
@@ -162,6 +164,19 @@ export interface ElectronAPI {
     update: (id: string, balance: Partial<LabMonthlyBalance>) => Promise<LabMonthlyBalance | null>
     updateOrCreate: (labId: string, year: number, month: number, data: { total_cost?: number; total_paid?: number; remaining_balance?: number; status?: string; notes?: string }) => Promise<LabMonthlyBalance>
     delete: (id: string) => Promise<boolean>
+  }
+
+  // Clinic needs operations
+  clinicNeeds: {
+    getAll: () => Promise<any[]>
+    create: (need: any) => Promise<any>
+    update: (id: string, need: any) => Promise<any>
+    delete: (id: string) => Promise<boolean>
+    applySupplierPayment: (payment: ClinicNeedSupplierPaymentInput) => Promise<ClinicNeedSupplierPaymentResult>
+    search: (query: string) => Promise<any[]>
+    getByStatus: (status: string) => Promise<any[]>
+    getByPriority: (priority: string) => Promise<any[]>
+    getStatistics: () => Promise<any>
   }
 
   // Medication operations

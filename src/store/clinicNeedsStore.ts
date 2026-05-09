@@ -1,9 +1,21 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
-import type { ClinicNeed } from '../types'
+import {
+  getClinicNeedPaid,
+  getClinicNeedPaymentStatus,
+  getClinicNeedRemaining,
+  getClinicNeedTotal
+} from '../utils/clinicNeedPayments'
+import type {
+  ClinicNeed,
+  ClinicNeedPaymentStatus,
+  ClinicNeedSupplierPaymentInput,
+  ClinicNeedSupplierPaymentResult
+} from '../types'
 
 interface ClinicNeedsFilters {
   supplier?: string
+  paymentStatus?: ClinicNeedPaymentStatus
 }
 
 interface ClinicNeedsState {
@@ -24,6 +36,11 @@ interface ClinicNeedsState {
   orderedCount: number
   receivedCount: number
   urgentCount: number
+  totalPaid: number
+  totalRemaining: number
+  paidCount: number
+  partialCount: number
+  unpaidCount: number
 }
 
 interface ClinicNeedsActions {
@@ -32,6 +49,7 @@ interface ClinicNeedsActions {
   createNeed: (need: Omit<ClinicNeed, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
   updateNeed: (id: string, need: Partial<ClinicNeed>) => Promise<void>
   deleteNeed: (id: string) => Promise<void>
+  applySupplierPayment: (payment: ClinicNeedSupplierPaymentInput) => Promise<ClinicNeedSupplierPaymentResult>
 
   // UI state operations
   setSelectedNeed: (need: ClinicNeed | null) => void
@@ -76,6 +94,11 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
       orderedCount: 0,
       receivedCount: 0,
       urgentCount: 0,
+      totalPaid: 0,
+      totalRemaining: 0,
+      paidCount: 0,
+      partialCount: 0,
+      unpaidCount: 0,
 
       // Data operations
       loadNeeds: async () => {
@@ -215,6 +238,34 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
         }
       },
 
+      applySupplierPayment: async (paymentData) => {
+        set({ isLoading: true, error: null })
+        try {
+          const result = await window.electronAPI.clinicNeeds.applySupplierPayment(paymentData)
+
+          await get().loadNeeds()
+
+          if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('clinic-needs-changed', {
+              detail: {
+                type: 'payment',
+                supplier: paymentData.supplier,
+                result
+              }
+            }))
+          }
+
+          return result
+        } catch (error) {
+          console.error('Error applying supplier payment:', error)
+          set({
+            error: error instanceof Error ? error.message : 'Failed to apply supplier payment',
+            isLoading: false
+          })
+          throw error
+        }
+      },
+
       // UI state operations
       setSelectedNeed: (need) => set({ selectedNeed: need }),
       setSearchQuery: (query) => {
@@ -245,7 +296,11 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
 
         // Apply supplier filter
         if (filters.supplier) {
-          filtered = filtered.filter(need => need.supplier === filters.supplier)
+          filtered = filtered.filter(need => need.supplier?.trim() === filters.supplier)
+        }
+
+        if (filters.paymentStatus) {
+          filtered = filtered.filter(need => getClinicNeedPaymentStatus(need) === filters.paymentStatus)
         }
 
         set({ filteredNeeds: filtered })
@@ -256,11 +311,16 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
         const { needs } = get()
 
         const totalNeeds = needs.length
-        const totalValue = needs.reduce((sum, need) => sum + (need.price * need.quantity), 0)
+        const totalValue = needs.reduce((sum, need) => sum + getClinicNeedTotal(need), 0)
+        const totalPaid = needs.reduce((sum, need) => sum + getClinicNeedPaid(need), 0)
+        const totalRemaining = needs.reduce((sum, need) => sum + getClinicNeedRemaining(need), 0)
         const pendingCount = needs.filter(need => need.status === 'pending').length
         const orderedCount = needs.filter(need => need.status === 'ordered').length
         const receivedCount = needs.filter(need => need.status === 'received').length
         const urgentCount = needs.filter(need => need.priority === 'urgent').length
+        const paidCount = needs.filter(need => getClinicNeedPaymentStatus(need) === 'paid').length
+        const partialCount = needs.filter(need => getClinicNeedPaymentStatus(need) === 'partial').length
+        const unpaidCount = needs.filter(need => getClinicNeedPaymentStatus(need) === 'unpaid').length
 
         set({
           totalNeeds,
@@ -268,7 +328,12 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
           pendingCount,
           orderedCount,
           receivedCount,
-          urgentCount
+          urgentCount,
+          totalPaid,
+          totalRemaining,
+          paidCount,
+          partialCount,
+          unpaidCount
         })
       },
 
@@ -289,7 +354,11 @@ export const useClinicNeedsStore = create<ClinicNeedsStore>()(
 
       updateSuppliers: () => {
         const { needs } = get()
-        const suppliers = [...new Set(needs.map(need => need.supplier).filter(Boolean))]
+        const suppliers = [...new Set(
+          needs
+            .map(need => need.supplier?.trim())
+            .filter((supplier): supplier is string => Boolean(supplier))
+        )]
         set({ suppliers })
       },
 

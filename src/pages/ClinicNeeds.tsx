@@ -1,64 +1,54 @@
 import React, { useState, useEffect } from 'react'
 import { useClinicNeedsStore } from '../store/clinicNeedsStore'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Button } from '../components/ui/button'
 import {
   ClipboardList,
   Plus,
   Package,
   DollarSign,
-  AlertTriangle,
-  Clock,
-  Download
+  Download,
+  CreditCard,
+  Wallet
 } from 'lucide-react'
 import { formatCurrency } from '../lib/utils'
-import { getCardStyles, getIconStyles } from '../lib/cardStyles'
+import { getIconStyles } from '../lib/cardStyles'
 import AddClinicNeedDialog from '../components/clinic-needs/AddClinicNeedDialog'
 import DeleteClinicNeedDialog from '../components/clinic-needs/DeleteClinicNeedDialog'
 import ClinicNeedsTable from '../components/clinic-needs/ClinicNeedsTable'
 import ClinicNeedsFilters from '../components/clinic-needs/ClinicNeedsFilters'
-import { useToast } from '@/hooks/use-toast'
+import SupplierPaymentDialog from '../components/clinic-needs/SupplierPaymentDialog'
 import { ExportService } from '../services/exportService'
 import { notify } from '../services/notificationService'
 import type { ClinicNeed } from '../types'
 
 const ClinicNeeds: React.FC = () => {
   const {
-    needs,
     filteredNeeds,
     isLoading,
     error,
     searchQuery,
     filters,
-    categories,
     suppliers,
     totalNeeds,
     totalValue,
-    pendingCount,
-    orderedCount,
-    receivedCount,
-    urgentCount,
+    totalPaid,
+    totalRemaining,
     loadNeeds,
-    deleteNeed,
-    updateNeed,
     setSearchQuery,
     setFilters,
     clearError
   } = useClinicNeedsStore()
 
-  const { toast } = useToast()
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [editingNeed, setEditingNeed] = useState<ClinicNeed | null>(null)
   const [deletingNeed, setDeletingNeed] = useState<ClinicNeed | null>(null)
 
   useEffect(() => {
     loadNeeds()
   }, [loadNeeds])
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value)
-  }
 
   const handleFilterChange = (key: string, value: string) => {
     setFilters({
@@ -80,26 +70,6 @@ const ClinicNeeds: React.FC = () => {
   const handleDelete = (need: ClinicNeed) => {
     setDeletingNeed(need)
     setShowDeleteDialog(true)
-  }
-
-  const handleMarkAsReceived = async (need: ClinicNeed) => {
-    try {
-      const updatedData: Partial<ClinicNeed> = {
-        status: 'received'
-      }
-
-      await updateNeed(need.id, updatedData)
-      toast({
-        title: "تم تأكيد الاستلام",
-        description: `تم تأكيد استلام "${need.need_name}" وتحديث حالته إلى مستلم`,
-      })
-    } catch (error) {
-      toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تأكيد الاستلام",
-        variant: "destructive",
-      })
-    }
   }
 
   const handleCloseAddDialog = () => {
@@ -166,6 +136,14 @@ const ClinicNeeds: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            variant="success"
+            onClick={() => setShowPaymentDialog(true)}
+            className="btn-modern flex items-center gap-2"
+          >
+            <CreditCard className="w-4 h-4 ml-2" />
+            دفع
+          </Button>
+          <Button
             variant="outline"
             className="btn-modern btn-modern-ghost"
             onClick={async () => {
@@ -204,22 +182,22 @@ const ClinicNeeds: React.FC = () => {
           icon={<Package />}
           color="blue"
         />
-        <StatCard
+        {/* <StatCard
           title="إجمالي السعر"
           value={formatCurrency(totalValue)}
           icon={<DollarSign />}
           color="green"
-        />
+        /> */}
         <StatCard
-          title="معلق"
-          value={pendingCount}
-          icon={<Clock />}
+          title="المبالغ المدفوعة"
+          value={formatCurrency(totalPaid)}
+          icon={<Wallet />}
           color="yellow"
         />
         <StatCard
-          title="عاجل"
-          value={urgentCount}
-          icon={<AlertTriangle />}
+          title="ديون المستودعات"
+          value={formatCurrency(totalRemaining)}
+          icon={<CreditCard />}
           color="red"
         />
       </div>
@@ -244,7 +222,6 @@ const ClinicNeeds: React.FC = () => {
             needs={filteredNeeds}
             onEdit={handleEdit}
             onDelete={handleDelete}
-            onReceiveAndDelete={handleMarkAsReceived}
             isLoading={isLoading}
           />
         </CardContent>
@@ -261,6 +238,11 @@ const ClinicNeeds: React.FC = () => {
         open={showDeleteDialog}
         onOpenChange={handleCloseDeleteDialog}
         need={deletingNeed}
+      />
+
+      <SupplierPaymentDialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
       />
     </div>
   )

@@ -482,9 +482,45 @@ CREATE TABLE IF NOT EXISTS clinic_needs (
     status TEXT DEFAULT 'pending', -- pending, ordered, received, cancelled
     supplier TEXT,
     notes TEXT,
+    paid_amount REAL DEFAULT 0,
+    remaining_balance REAL DEFAULT 0,
+    payment_status TEXT DEFAULT 'unpaid' CHECK (payment_status IN ('paid', 'partial', 'unpaid')),
+    last_payment_date DATETIME,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Clinic need supplier payments and allocations
+CREATE TABLE IF NOT EXISTS clinic_need_payments (
+    id TEXT PRIMARY KEY,
+    supplier TEXT NOT NULL,
+    amount REAL NOT NULL,
+    payment_date DATETIME NOT NULL,
+    notes TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS clinic_need_payment_allocations (
+    id TEXT PRIMARY KEY,
+    payment_id TEXT NOT NULL,
+    clinic_need_id TEXT NOT NULL,
+    amount REAL NOT NULL,
+    previous_paid_amount REAL DEFAULT 0,
+    previous_remaining_balance REAL DEFAULT 0,
+    new_paid_amount REAL DEFAULT 0,
+    new_remaining_balance REAL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (payment_id) REFERENCES clinic_need_payments(id) ON DELETE CASCADE,
+    FOREIGN KEY (clinic_need_id) REFERENCES clinic_needs(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_clinic_needs_supplier ON clinic_needs(supplier);
+CREATE INDEX IF NOT EXISTS idx_clinic_needs_payment_status ON clinic_needs(payment_status);
+CREATE INDEX IF NOT EXISTS idx_clinic_needs_remaining_balance ON clinic_needs(remaining_balance);
+CREATE INDEX IF NOT EXISTS idx_clinic_need_payments_supplier ON clinic_need_payments(supplier);
+CREATE INDEX IF NOT EXISTS idx_clinic_need_payments_date ON clinic_need_payments(payment_date);
+CREATE INDEX IF NOT EXISTS idx_clinic_need_allocations_payment ON clinic_need_payment_allocations(payment_id);
+CREATE INDEX IF NOT EXISTS idx_clinic_need_allocations_need ON clinic_need_payment_allocations(clinic_need_id);
 
 -- Clinic expenses table for operational expenses (salaries, utilities, etc.)
 CREATE TABLE IF NOT EXISTS clinic_expenses (

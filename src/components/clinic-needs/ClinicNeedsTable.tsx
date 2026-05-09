@@ -20,24 +20,28 @@ import {
   Edit,
   Trash2,
   Clock,
-  ShoppingCart,
   CheckCircle,
-  AlertTriangle,
   Package,
-  Check,
+  XCircle,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
   ChevronsRight
 } from 'lucide-react'
 import { formatCurrency } from '../../lib/utils'
+import {
+  getClinicNeedPaid,
+  getClinicNeedPaymentStatus,
+  getClinicNeedRemaining,
+  getClinicNeedTotal,
+  getPaymentStatusLabel
+} from '../../utils/clinicNeedPayments'
 import type { ClinicNeed } from '../../types'
 
 interface ClinicNeedsTableProps {
   needs: ClinicNeed[]
   onEdit: (need: ClinicNeed) => void
   onDelete: (need: ClinicNeed) => void
-  onReceiveAndDelete: (need: ClinicNeed) => void
   isLoading?: boolean
 }
 
@@ -45,7 +49,6 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
   needs,
   onEdit,
   onDelete,
-  onReceiveAndDelete,
   isLoading = false
 }) => {
   const [currentPage, setCurrentPage] = useState(1)
@@ -65,40 +68,21 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
     setPageSize(parseInt(value))
     setCurrentPage(1) // Reset to first page when changing page size
   }
-  const getStatusBadge = (status: string) => {
+  const getPaymentStatusBadge = (need: ClinicNeed) => {
+    const status = getClinicNeedPaymentStatus(need)
     const statusConfig = {
-      pending: { label: 'معلق', variant: 'secondary' as const, icon: Clock },
-      ordered: { label: 'مطلوب', variant: 'default' as const, icon: ShoppingCart },
-      received: { label: 'مستلم', variant: 'default' as const, icon: CheckCircle },
-      cancelled: { label: 'ملغي', variant: 'destructive' as const, icon: AlertTriangle }
+      paid: { variant: 'default' as const, icon: CheckCircle, className: 'bg-green-100 text-green-800 hover:bg-green-100' },
+      partial: { variant: 'default' as const, icon: Clock, className: 'bg-amber-100 text-amber-800 hover:bg-amber-100' },
+      unpaid: { variant: 'destructive' as const, icon: XCircle, className: '' }
     }
 
-    const config = statusConfig[status as keyof typeof statusConfig]
-    if (!config) return null
-
+    const config = statusConfig[status]
     const Icon = config.icon
+
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1 w-fit">
+      <Badge variant={config.variant} className={`flex items-center gap-1 w-fit ${config.className}`}>
         <Icon className="w-3 h-3" />
-        {config.label}
-      </Badge>
-    )
-  }
-
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig = {
-      low: { label: 'منخفض', variant: 'secondary' as const, color: 'bg-gray-100 text-gray-800' },
-      medium: { label: 'متوسط', variant: 'default' as const, color: 'bg-blue-100 text-blue-800' },
-      high: { label: 'عالي', variant: 'default' as const, color: 'bg-orange-100 text-orange-800' },
-      urgent: { label: 'عاجل', variant: 'destructive' as const, color: 'bg-red-100 text-red-800' }
-    }
-
-    const config = priorityConfig[priority as keyof typeof priorityConfig]
-    if (!config) return null
-
-    return (
-      <Badge variant={config.variant} className={`${config.color} w-fit`}>
-        {config.label}
+        {getPaymentStatusLabel(status)}
       </Badge>
     )
   }
@@ -136,14 +120,21 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
             <TableHead className="text-right">الكمية</TableHead>
             <TableHead className="text-right">السعر</TableHead>
             <TableHead className="text-right">الإجمالي</TableHead>
-            <TableHead className="text-right">الحالة</TableHead>
-            <TableHead className="text-right">المورد</TableHead>
+            <TableHead className="text-right">المدفوع</TableHead>
+            <TableHead className="text-right">المتبقي</TableHead>
+            <TableHead className="text-right">حالة الدفع</TableHead>
+            <TableHead className="text-right">المستودع</TableHead>
             <TableHead className="text-right">الإجراءات</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {paginatedNeeds.map((need, index) => (
-            <TableRow key={need.id} className="hover:bg-muted/50">
+          {paginatedNeeds.map((need, index) => {
+            const total = getClinicNeedTotal(need)
+            const paid = getClinicNeedPaid(need)
+            const remaining = getClinicNeedRemaining(need)
+
+            return (
+              <TableRow key={need.id} className="hover:bg-muted/50">
               <TableCell className="font-medium text-center">
                 <span className="text-sm text-muted-foreground">
                   {startIndex + index + 1}
@@ -171,7 +162,7 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
 
               <TableCell>
                 <span className="font-bold text-primary">
-                  {formatCurrency(need.price * need.quantity)}
+                  {formatCurrency(total)}
                 </span>
               </TableCell>
 
@@ -183,12 +174,18 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
                 )}
               </TableCell> */}
 
-              {/* <TableCell>
-                {getPriorityBadge(need.priority)}
-              </TableCell> */}
+              <TableCell>
+                <span className="font-semibold text-green-600">{formatCurrency(paid)}</span>
+              </TableCell>
 
               <TableCell>
-                {getStatusBadge(need.status)}
+                <span className={`font-semibold ${remaining > 0 ? 'text-orange-600' : 'text-green-600'}`}>
+                  {formatCurrency(remaining)}
+                </span>
+              </TableCell>
+
+              <TableCell>
+                {getPaymentStatusBadge(need)}
               </TableCell>
 
               <TableCell>
@@ -199,19 +196,6 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
 
               <TableCell>
                 <div className="flex items-center gap-2">
-                  {/* زر تأكيد الاستلام - يظهر فقط إذا لم يكن مستلماً بعد */}
-                  {need.status !== 'received' && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onReceiveAndDelete(need)}
-                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
-                      title="تأكيد الاستلام وتحديث الحالة إلى مستلم"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  )}
-
                   <Button
                     variant="ghost"
                     size="sm"
@@ -231,7 +215,8 @@ const ClinicNeedsTable: React.FC<ClinicNeedsTableProps> = ({
                 </div>
               </TableCell>
             </TableRow>
-          ))}
+            )
+          })}
         </TableBody>
       </Table>
 

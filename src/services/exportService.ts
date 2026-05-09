@@ -2785,12 +2785,15 @@ export class ExportService {
         'الكمية',
         'السعر',
         'الإجمالي',
+        'المدفوع',
+        'المتبقي',
+        'حالة الدفع',
         'الوصف',
         'الفئة',
         'الأولوية',
-        'الحالة',
         'المورد',
         'الملاحظات',
+        'تاريخ آخر دفعة',
         'تاريخ الإنشاء',
         'تاريخ التحديث'
       ]
@@ -2815,21 +2818,31 @@ export class ExportService {
       }
 
       // Convert data to CSV format
-      const csvData = clinicNeeds.map(need => [
-        need.serial_number || '',
-        need.need_name || '',
-        need.quantity?.toString() || '0',
-        need.price?.toString() || '0',
-        ((need.price || 0) * (need.quantity || 0)).toString(),
-        need.description || '',
-        need.category || '',
-        this.getPriorityLabel(need.priority || ''),
-        this.getStatusLabel(need.status || ''),
-        need.supplier || '',
-        need.notes || '',
-        need.created_at ? formatGregorianDate(need.created_at) : '',
-        need.updated_at ? formatGregorianDate(need.updated_at) : ''
-      ])
+      const csvData = clinicNeeds.map(need => {
+        const total = (need.price || 0) * (need.quantity || 0)
+        const paid = Math.min(total, Math.max(0, need.paid_amount || 0))
+        const remaining = Math.min(total, Math.max(0, need.remaining_balance ?? (total - paid)))
+        const paymentStatus = remaining <= 0 ? 'مدفوع' : paid > 0 ? 'مدفوع جزئياً' : 'غير مدفوع'
+
+        return [
+          need.serial_number || '',
+          need.need_name || '',
+          need.quantity?.toString() || '0',
+          need.price?.toString() || '0',
+          total.toString(),
+          paid.toString(),
+          remaining.toString(),
+          paymentStatus,
+          need.description || '',
+          need.category || '',
+          this.getPriorityLabel(need.priority || ''),
+          need.supplier || '',
+          need.notes || '',
+          need.last_payment_date ? formatGregorianDate(need.last_payment_date) : '',
+          need.created_at ? formatGregorianDate(need.created_at) : '',
+          need.updated_at ? formatGregorianDate(need.updated_at) : ''
+        ]
+      })
 
       // Combine headers and data
       const csvContent = [headers, ...csvData]

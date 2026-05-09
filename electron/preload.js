@@ -251,6 +251,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     create: (need) => ipcRenderer.invoke('db:clinicNeeds:create', need),
     update: (id, need) => ipcRenderer.invoke('db:clinicNeeds:update', id, need),
     delete: (id) => ipcRenderer.invoke('db:clinicNeeds:delete', id),
+    applySupplierPayment: (payment) => ipcRenderer.invoke('db:clinicNeeds:applySupplierPayment', payment),
     search: (query) => ipcRenderer.invoke('db:clinicNeeds:search', query),
     getByStatus: (status) => ipcRenderer.invoke('db:clinicNeeds:getByStatus', status),
     getByPriority: (priority) => ipcRenderer.invoke('db:clinicNeeds:getByPriority', priority),

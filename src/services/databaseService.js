@@ -3246,6 +3246,10 @@ class DatabaseService {
             status TEXT DEFAULT 'pending',
             supplier TEXT,
             notes TEXT,
+            paid_amount REAL DEFAULT 0,
+            remaining_balance REAL DEFAULT 0,
+            payment_status TEXT DEFAULT 'unpaid',
+            last_payment_date DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
           )
@@ -3254,6 +3258,8 @@ class DatabaseService {
       } else {
         console.log('✅ [DEBUG] Clinic needs table already exists')
       }
+
+      this.ensureClinicNeedsPaymentSchema()
 
       // Create indexes if they don't exist
       this.createClinicNeedsIndexes()
@@ -3303,6 +3309,113 @@ class DatabaseService {
     }
   }
 
+  roundMoney(amount) {
+    return Math.round((Number(amount) || 0) * 100) / 100
+  }
+
+  getClinicNeedTotal(need) {
+    return this.roundMoney((Number(need.price) || 0) * (Number(need.quantity) || 0))
+  }
+
+  calculateClinicNeedPaymentFields(need) {
+    const total = this.getClinicNeedTotal(need)
+    const paidAmount = Math.min(total, Math.max(0, this.roundMoney(need.paid_amount || 0)))
+    const fallbackRemaining = total - paidAmount
+    const rawRemaining = need.remaining_balance === undefined || need.remaining_balance === null
+      ? fallbackRemaining
+      : Number(need.remaining_balance)
+    const remainingBalance = Math.min(total, Math.max(0, this.roundMoney(rawRemaining)))
+    const paymentStatus = remainingBalance <= 0
+      ? 'paid'
+      : paidAmount > 0
+        ? 'partial'
+        : 'unpaid'
+
+    return {
+      paidAmount,
+      remainingBalance,
+      paymentStatus
+    }
+  }
+
+  ensureClinicNeedsPaymentSchema() {
+    const columns = this.db.prepare('PRAGMA table_info(clinic_needs)').all()
+    const columnNames = new Set(columns.map((column) => column.name))
+    const hadRemainingBalance = columnNames.has('remaining_balance')
+    const columnsToAdd = [
+      { name: 'paid_amount', definition: 'REAL DEFAULT 0' },
+      { name: 'remaining_balance', definition: 'REAL DEFAULT 0' },
+      { name: 'payment_status', definition: "TEXT DEFAULT 'unpaid'" },
+      { name: 'last_payment_date', definition: 'DATETIME' }
+    ]
+
+    columnsToAdd.forEach((column) => {
+      if (!columnNames.has(column.name)) {
+        this.db.exec(`ALTER TABLE clinic_needs ADD COLUMN ${column.name} ${column.definition}`)
+      }
+    })
+
+    if (!hadRemainingBalance) {
+      this.db.exec(`
+        UPDATE clinic_needs
+        SET remaining_balance = CASE
+          WHEN (price * quantity) - COALESCE(paid_amount, 0) < 0 THEN 0
+          ELSE (price * quantity) - COALESCE(paid_amount, 0)
+        END
+      `)
+    }
+
+    this.db.exec(`
+      UPDATE clinic_needs
+      SET
+        paid_amount = COALESCE(paid_amount, 0),
+        remaining_balance = CASE
+          WHEN remaining_balance IS NULL THEN
+            CASE
+              WHEN (price * quantity) - COALESCE(paid_amount, 0) < 0 THEN 0
+              ELSE (price * quantity) - COALESCE(paid_amount, 0)
+            END
+          WHEN remaining_balance < 0 THEN 0
+          ELSE remaining_balance
+        END,
+        payment_status = CASE
+          WHEN COALESCE(remaining_balance, (price * quantity) - COALESCE(paid_amount, 0)) <= 0 THEN 'paid'
+          WHEN COALESCE(paid_amount, 0) > 0 THEN 'partial'
+          ELSE 'unpaid'
+        END
+    `)
+
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS clinic_need_payments (
+        id TEXT PRIMARY KEY,
+        supplier TEXT NOT NULL,
+        amount REAL NOT NULL,
+        payment_date DATETIME NOT NULL,
+        notes TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS clinic_need_payment_allocations (
+        id TEXT PRIMARY KEY,
+        payment_id TEXT NOT NULL,
+        clinic_need_id TEXT NOT NULL,
+        amount REAL NOT NULL,
+        previous_paid_amount REAL DEFAULT 0,
+        previous_remaining_balance REAL DEFAULT 0,
+        new_paid_amount REAL DEFAULT 0,
+        new_remaining_balance REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (payment_id) REFERENCES clinic_need_payments(id) ON DELETE CASCADE,
+        FOREIGN KEY (clinic_need_id) REFERENCES clinic_needs(id) ON DELETE CASCADE
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_clinic_need_payments_supplier ON clinic_need_payments(supplier);
+      CREATE INDEX IF NOT EXISTS idx_clinic_need_payments_date ON clinic_need_payments(payment_date);
+      CREATE INDEX IF NOT EXISTS idx_clinic_need_allocations_payment ON clinic_need_payment_allocations(payment_id);
+      CREATE INDEX IF NOT EXISTS idx_clinic_need_allocations_need ON clinic_need_payment_allocations(clinic_need_id);
+    `)
+  }
+
   createClinicNeedsIndexes() {
     try {
       console.log('🔍 Creating clinic needs indexes...')
@@ -3313,6 +3426,8 @@ class DatabaseService {
         'CREATE INDEX IF NOT EXISTS idx_clinic_needs_category ON clinic_needs(category)',
         'CREATE INDEX IF NOT EXISTS idx_clinic_needs_priority ON clinic_needs(priority)',
         'CREATE INDEX IF NOT EXISTS idx_clinic_needs_status ON clinic_needs(status)',
+        'CREATE INDEX IF NOT EXISTS idx_clinic_needs_payment_status ON clinic_needs(payment_status)',
+        'CREATE INDEX IF NOT EXISTS idx_clinic_needs_remaining_balance ON clinic_needs(remaining_balance)',
         'CREATE INDEX IF NOT EXISTS idx_clinic_needs_supplier ON clinic_needs(supplier)',
         'CREATE INDEX IF NOT EXISTS idx_clinic_needs_created_at ON clinic_needs(created_at)'
       ]
@@ -4217,12 +4332,18 @@ class DatabaseService {
 
     const id = uuidv4()
     const now = new Date().toISOString()
+    const paymentFields = this.calculateClinicNeedPaymentFields({
+      ...needData,
+      paid_amount: needData.paid_amount || 0,
+      remaining_balance: needData.remaining_balance
+    })
 
     const stmt = this.db.prepare(`
       INSERT INTO clinic_needs (
         id, serial_number, need_name, quantity, price, description,
-        category, priority, status, supplier, notes, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        category, priority, status, supplier, notes, paid_amount,
+        remaining_balance, payment_status, last_payment_date, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     stmt.run(
@@ -4237,6 +4358,10 @@ class DatabaseService {
       needData.status || 'pending',
       needData.supplier || null,
       needData.notes || null,
+      paymentFields.paidAmount,
+      paymentFields.remainingBalance,
+      paymentFields.paymentStatus,
+      needData.last_payment_date || null,
       now,
       now
     )
@@ -4249,6 +4374,29 @@ class DatabaseService {
     this.ensureClinicNeedsTableExists()
 
     const now = new Date().toISOString()
+    const existingNeed = await this.getClinicNeedById(id)
+
+    if (!existingNeed) {
+      return null
+    }
+
+    const mergedNeed = {
+      ...existingNeed,
+      ...needData
+    }
+
+    const shouldRecalculateRemaining =
+      needData.price !== undefined ||
+      needData.quantity !== undefined ||
+      needData.paid_amount !== undefined ||
+      needData.remaining_balance === undefined
+
+    const paymentFields = this.calculateClinicNeedPaymentFields({
+      ...mergedNeed,
+      remaining_balance: shouldRecalculateRemaining
+        ? undefined
+        : mergedNeed.remaining_balance
+    })
 
     const stmt = this.db.prepare(`
       UPDATE clinic_needs SET
@@ -4262,21 +4410,29 @@ class DatabaseService {
         status = ?,
         supplier = ?,
         notes = ?,
+        paid_amount = ?,
+        remaining_balance = ?,
+        payment_status = ?,
+        last_payment_date = ?,
         updated_at = ?
       WHERE id = ?
     `)
 
     stmt.run(
-      needData.serial_number,
-      needData.need_name,
-      needData.quantity,
-      needData.price,
-      needData.description || null,
-      needData.category || null,
-      needData.priority || 'medium',
-      needData.status || 'pending',
-      needData.supplier || null,
-      needData.notes || null,
+      mergedNeed.serial_number,
+      mergedNeed.need_name,
+      mergedNeed.quantity,
+      mergedNeed.price,
+      mergedNeed.description || null,
+      mergedNeed.category || null,
+      mergedNeed.priority || 'medium',
+      mergedNeed.status || 'pending',
+      mergedNeed.supplier || null,
+      mergedNeed.notes || null,
+      paymentFields.paidAmount,
+      paymentFields.remainingBalance,
+      paymentFields.paymentStatus,
+      mergedNeed.last_payment_date || null,
       now,
       id
     )
@@ -4294,6 +4450,169 @@ class DatabaseService {
 
     const result = stmt.run(id)
     return result.changes > 0
+  }
+
+  async applyClinicNeedSupplierPayment(paymentData) {
+    this.ensureConnection()
+    this.ensureClinicNeedsTableExists()
+
+    const supplier = (paymentData.supplier || '').trim()
+    const amount = this.roundMoney(paymentData.amount)
+    const paymentDate = paymentData.payment_date
+    const notes = paymentData.notes || null
+
+    if (!supplier) {
+      throw new Error('يجب اختيار المستودع')
+    }
+
+    if (!paymentDate) {
+      throw new Error('تاريخ الدفعة مطلوب')
+    }
+
+    if (!amount || amount <= 0) {
+      throw new Error('قيمة الدفعة يجب أن تكون أكبر من صفر')
+    }
+
+    const transaction = this.db.transaction(() => {
+      const payableNeeds = this.db.prepare(`
+        SELECT *,
+          COALESCE(
+            remaining_balance,
+            CASE
+              WHEN (price * quantity) - COALESCE(paid_amount, 0) < 0 THEN 0
+              ELSE (price * quantity) - COALESCE(paid_amount, 0)
+            END
+          ) as calculated_remaining
+        FROM clinic_needs
+        WHERE TRIM(COALESCE(supplier, '')) = ?
+          AND COALESCE(
+            remaining_balance,
+            CASE
+              WHEN (price * quantity) - COALESCE(paid_amount, 0) < 0 THEN 0
+              ELSE (price * quantity) - COALESCE(paid_amount, 0)
+            END
+          ) > 0
+        ORDER BY calculated_remaining ASC, created_at ASC
+      `).all(supplier)
+
+      if (payableNeeds.length === 0) {
+        throw new Error('لا توجد طلبات غير مسددة لهذا المستودع')
+      }
+
+      const totalRemaining = this.roundMoney(
+        payableNeeds.reduce((sum, need) => sum + this.calculateClinicNeedPaymentFields(need).remainingBalance, 0)
+      )
+
+      if (amount > totalRemaining) {
+        throw new Error(`قيمة الدفعة لا يمكن أن تتجاوز الدين المتبقي (${totalRemaining})`)
+      }
+
+      const paymentId = uuidv4()
+      const now = new Date().toISOString()
+      const allocations = []
+      let remainingPayment = amount
+
+      this.db.prepare(`
+        INSERT INTO clinic_need_payments (id, supplier, amount, payment_date, notes, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(paymentId, supplier, amount, paymentDate, notes, now)
+
+      const updateNeedStmt = this.db.prepare(`
+        UPDATE clinic_needs
+        SET paid_amount = ?,
+            remaining_balance = ?,
+            payment_status = ?,
+            last_payment_date = ?,
+            updated_at = ?
+        WHERE id = ?
+      `)
+
+      const insertAllocationStmt = this.db.prepare(`
+        INSERT INTO clinic_need_payment_allocations (
+          id, payment_id, clinic_need_id, amount, previous_paid_amount,
+          previous_remaining_balance, new_paid_amount, new_remaining_balance, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+
+      for (const need of payableNeeds) {
+        if (remainingPayment <= 0) break
+
+        const currentFields = this.calculateClinicNeedPaymentFields(need)
+        const appliedAmount = this.roundMoney(Math.min(currentFields.remainingBalance, remainingPayment))
+        const newPaidAmount = this.roundMoney(currentFields.paidAmount + appliedAmount)
+        const newRemainingBalance = this.roundMoney(Math.max(0, this.getClinicNeedTotal(need) - newPaidAmount))
+        const paymentStatus = newRemainingBalance <= 0
+          ? 'paid'
+          : newPaidAmount > 0
+            ? 'partial'
+            : 'unpaid'
+
+        updateNeedStmt.run(
+          newPaidAmount,
+          newRemainingBalance,
+          paymentStatus,
+          paymentDate,
+          now,
+          need.id
+        )
+
+        insertAllocationStmt.run(
+          uuidv4(),
+          paymentId,
+          need.id,
+          appliedAmount,
+          currentFields.paidAmount,
+          currentFields.remainingBalance,
+          newPaidAmount,
+          newRemainingBalance,
+          now
+        )
+
+        allocations.push({
+          clinic_need_id: need.id,
+          need_name: need.need_name,
+          previous_paid_amount: currentFields.paidAmount,
+          previous_remaining_balance: currentFields.remainingBalance,
+          applied_amount: appliedAmount,
+          new_paid_amount: newPaidAmount,
+          new_remaining_balance: newRemainingBalance,
+          payment_status: paymentStatus
+        })
+
+        remainingPayment = this.roundMoney(remainingPayment - appliedAmount)
+      }
+
+      const updatedNeeds = this.db.prepare(`
+        SELECT * FROM clinic_needs
+        WHERE TRIM(COALESCE(supplier, '')) = ?
+        ORDER BY created_at DESC
+      `).all(supplier)
+
+      const supplierTotals = updatedNeeds.reduce((totals, need) => {
+        const fields = this.calculateClinicNeedPaymentFields(need)
+        totals.paid += fields.paidAmount
+        totals.remaining += fields.remainingBalance
+        return totals
+      }, { paid: 0, remaining: 0 })
+
+      return {
+        payment: {
+          id: paymentId,
+          supplier,
+          amount,
+          payment_date: paymentDate,
+          notes: notes || undefined,
+          created_at: now
+        },
+        allocations,
+        updated_needs: updatedNeeds,
+        total_applied: this.roundMoney(amount - remainingPayment),
+        supplier_total_remaining: this.roundMoney(supplierTotals.remaining),
+        supplier_total_paid: this.roundMoney(supplierTotals.paid)
+      }
+    })
+
+    return transaction()
   }
 
   async searchClinicNeeds(searchQuery) {
@@ -4348,10 +4667,21 @@ class DatabaseService {
       SELECT
         COUNT(*) as total_needs,
         SUM(price * quantity) as total_value,
+        SUM(COALESCE(paid_amount, 0)) as total_paid,
+        SUM(COALESCE(
+          remaining_balance,
+          CASE
+            WHEN (price * quantity) - COALESCE(paid_amount, 0) < 0 THEN 0
+            ELSE (price * quantity) - COALESCE(paid_amount, 0)
+          END
+        )) as total_remaining,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending_count,
         SUM(CASE WHEN status = 'ordered' THEN 1 ELSE 0 END) as ordered_count,
         SUM(CASE WHEN status = 'received' THEN 1 ELSE 0 END) as received_count,
-        SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent_count
+        SUM(CASE WHEN priority = 'urgent' THEN 1 ELSE 0 END) as urgent_count,
+        SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) as paid_count,
+        SUM(CASE WHEN payment_status = 'partial' THEN 1 ELSE 0 END) as partial_count,
+        SUM(CASE WHEN payment_status = 'unpaid' THEN 1 ELSE 0 END) as unpaid_count
       FROM clinic_needs
     `)
 

@@ -3027,6 +3027,30 @@ ipcMain.handle('db:clinicNeeds:delete', async (_, id) => {
   }
 })
 
+ipcMain.handle('db:clinicNeeds:applySupplierPayment', async (_, payment) => {
+  try {
+    if (databaseService) {
+      console.log('Applying clinic need supplier payment:', payment)
+      const result = await databaseService.applyClinicNeedSupplierPayment(payment)
+      console.log('Clinic need supplier payment applied successfully:', result.payment.id)
+      return result
+    } else {
+      console.log('Applying clinic need supplier payment (mock):', payment)
+      return {
+        payment: { ...payment, id: Date.now().toString(), created_at: new Date().toISOString() },
+        allocations: [],
+        updated_needs: [],
+        total_applied: payment.amount || 0,
+        supplier_total_remaining: 0,
+        supplier_total_paid: payment.amount || 0
+      }
+    }
+  } catch (error) {
+    console.error('Error applying clinic need supplier payment:', error)
+    throw error
+  }
+})
+
 ipcMain.handle('db:clinicNeeds:search', async (_, query) => {
   try {
     if (databaseService) {

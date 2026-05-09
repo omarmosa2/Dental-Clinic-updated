@@ -158,6 +158,7 @@ declare global {
         create: (need: any) => Promise<any>
         update: (id: string, need: any) => Promise<any>
         delete: (id: string) => Promise<boolean>
+        applySupplierPayment: (payment: any) => Promise<any>
         search: (query: string) => Promise<any[]>
         getByStatus: (status: string) => Promise<any[]>
         getByPriority: (priority: string) => Promise<any[]>

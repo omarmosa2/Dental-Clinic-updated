@@ -16,6 +16,7 @@ interface ClinicNeedsFiltersProps {
   onSearchChange: (query: string) => void
   filters: {
     supplier?: string
+    paymentStatus?: 'paid' | 'partial' | 'unpaid'
   }
   onFilterChange: (key: string, value: string) => void
   suppliers: string[]
@@ -30,7 +31,7 @@ const ClinicNeedsFilters: React.FC<ClinicNeedsFiltersProps> = ({
   suppliers,
   onClearFilters
 }) => {
-  const hasActiveFilters = searchQuery || filters.supplier
+  const hasActiveFilters = searchQuery || filters.supplier || filters.paymentStatus
 
   return (
     <Card>
@@ -71,15 +72,31 @@ const ClinicNeedsFilters: React.FC<ClinicNeedsFiltersProps> = ({
             onValueChange={(value) => onFilterChange('supplier', value)}
           >
             <SelectTrigger>
-              <SelectValue placeholder="المورد" />
+              <SelectValue placeholder="المستودع" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">جميع الموردين</SelectItem>
+              <SelectItem value="all">جميع المستودعات</SelectItem>
               {suppliers.map((supplier) => (
                 <SelectItem key={supplier} value={supplier}>
                   {supplier}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+
+          {/* Payment Status Filter */}
+          <Select
+            value={filters.paymentStatus || 'all'}
+            onValueChange={(value) => onFilterChange('paymentStatus', value)}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="حالة الدفع" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">جميع حالات الدفع</SelectItem>
+              <SelectItem value="paid">مدفوع</SelectItem>
+              <SelectItem value="partial">مدفوع جزئياً</SelectItem>
+              <SelectItem value="unpaid">غير مدفوع</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -96,7 +113,18 @@ const ClinicNeedsFilters: React.FC<ClinicNeedsFiltersProps> = ({
               )}
               {filters.supplier && filters.supplier !== 'all' && (
                 <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded mr-2 text-xs">
-                  المورد: {filters.supplier}
+                  المستودع: {filters.supplier}
+                </span>
+              )}
+              {filters.paymentStatus && (
+                <span className="inline-block bg-amber-100 text-amber-800 px-2 py-1 rounded mr-2 text-xs">
+                  حالة الدفع: {
+                    filters.paymentStatus === 'paid'
+                      ? 'مدفوع'
+                      : filters.paymentStatus === 'partial'
+                        ? 'مدفوع جزئياً'
+                        : 'غير مدفوع'
+                  }
                 </span>
               )}
             </div>
