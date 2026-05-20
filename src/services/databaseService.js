@@ -1964,6 +1964,110 @@ class DatabaseService {
     }
   }
 
+  async getUnpaidPatients() {
+    const stmt = this.db.prepare(`
+      WITH treatment_paid AS (
+        SELECT
+          tooth_treatment_id,
+          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+        FROM payments
+        WHERE tooth_treatment_id IS NOT NULL
+        GROUP BY tooth_treatment_id
+      ),
+      appointment_paid AS (
+        SELECT
+          appointment_id,
+          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+        FROM payments
+        WHERE appointment_id IS NOT NULL
+        GROUP BY appointment_id
+      )
+      SELECT
+        p.id as patient_id,
+        p.full_name as patient_name,
+        tt.id as reference_id,
+        tt.treatment_type as treatment_name,
+        COALESCE(tt.cost, 0) as total_amount,
+        COALESCE(tp.total_paid, 0) as amount_paid,
+        MAX(0, COALESCE(tt.cost, 0) - COALESCE(tp.total_paid, 0)) as remaining_balance,
+        CASE
+          WHEN COALESCE(tp.total_paid, 0) = 0 THEN 'unpaid'
+          ELSE 'partial'
+        END as status,
+        NULL as next_due_date,
+        NULL as payment_method,
+        'treatment' as source_type
+      FROM tooth_treatments tt
+      INNER JOIN patients p ON p.id = tt.patient_id
+      LEFT JOIN treatment_paid tp ON tp.tooth_treatment_id = tt.id
+      WHERE COALESCE(tt.cost, 0) > COALESCE(tp.total_paid, 0)
+
+      UNION ALL
+
+      SELECT
+        p.id as patient_id,
+        p.full_name as patient_name,
+        a.id as reference_id,
+        COALESCE(a.title, 'موعد') as treatment_name,
+        COALESCE(a.cost, 0) as total_amount,
+        COALESCE(ap.total_paid, 0) as amount_paid,
+        MAX(0, COALESCE(a.cost, 0) - COALESCE(ap.total_paid, 0)) as remaining_balance,
+        'pending' as status,
+        NULL as next_due_date,
+        NULL as payment_method,
+        'appointment' as source_type
+      FROM appointments a
+      INNER JOIN patients p ON p.id = a.patient_id
+      LEFT JOIN appointment_paid ap ON ap.appointment_id = a.id
+      WHERE a.status IN ('scheduled', 'no_show')
+        AND COALESCE(a.cost, 0) > COALESCE(ap.total_paid, 0)
+
+      ORDER BY remaining_balance DESC, patient_name ASC
+    `)
+
+    return stmt.all()
+  }
+
+  async getRemainingBalancePatients() {
+    const stmt = this.db.prepare(`
+      SELECT
+        p.id as patient_id,
+        p.full_name as patient_name,
+        COALESCE(ip.id, pm.id) as reference_id,
+        COALESCE(tt.treatment_type, a.title, 'دفعة متبقية') as treatment_name,
+        COALESCE(pm.total_amount_due, pm.amount, 0) as total_amount,
+        COALESCE(pm.amount_paid, pm.amount, 0) as amount_paid,
+        COALESCE(
+          pm.remaining_balance,
+          COALESCE(pm.total_amount_due, pm.amount, 0) - COALESCE(pm.amount_paid, pm.amount, 0),
+          0
+        ) as remaining_balance,
+        COALESCE(ip.status, pm.status, 'partial') as status,
+        ip.due_date as next_due_date,
+        pm.payment_method as payment_method,
+        CASE
+          WHEN ip.id IS NOT NULL THEN 'installment'
+          ELSE 'payment'
+        END as source_type
+      FROM payments pm
+      INNER JOIN patients p ON p.id = pm.patient_id
+      LEFT JOIN installment_payments ip
+        ON ip.payment_id = pm.id
+        AND ip.status != 'paid'
+      LEFT JOIN tooth_treatments tt ON tt.id = pm.tooth_treatment_id
+      LEFT JOIN appointments a ON a.id = pm.appointment_id
+      WHERE COALESCE(
+              pm.remaining_balance,
+              COALESCE(pm.total_amount_due, pm.amount, 0) - COALESCE(pm.amount_paid, pm.amount, 0),
+              0
+            ) > 0
+         OR ip.id IS NOT NULL
+      ORDER BY remaining_balance DESC, p.full_name ASC
+    `)
+
+    return stmt.all()
+  }
+
   async searchPayments(query) {
     this.ensureConnection()
 

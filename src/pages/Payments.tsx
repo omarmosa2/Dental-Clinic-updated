@@ -23,6 +23,7 @@ import EditPaymentDialog from '@/components/payments/EditPaymentDialog'
 import DeletePaymentDialog from '@/components/payments/DeletePaymentDialog'
 import PaymentReceiptDialog from '@/components/payments/PaymentReceiptDialog'
 import PaymentDetailsDialog from '@/components/payments/PaymentDetailsDialog'
+import PaymentSummaryDetailDialog from '@/components/payments/PaymentSummaryDetailDialog'
 import PaymentTable from '@/components/payments/PaymentTable'
 import {
   Plus,
@@ -36,7 +37,7 @@ import {
   Filter,
   X
 } from 'lucide-react'
-import type { Payment } from '@/types'
+import type { Payment, PaymentSummaryDetailRecord } from '@/types'
 import { notify } from '@/services/notificationService'
 import { ExportService } from '@/services/exportService'
 
@@ -51,6 +52,10 @@ export default function Payments() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showReceiptDialog, setShowReceiptDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
+  const [dialogType, setDialogType] = useState<'unpaid' | 'remaining' | null>(null)
+  const [dialogData, setDialogData] = useState<PaymentSummaryDetailRecord[]>([])
+  const [isSummaryDialogLoading, setIsSummaryDialogLoading] = useState(false)
+  const [remainingCardTotal, setRemainingCardTotal] = useState(0)
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null)
   const [preSelectedPatientId, setPreSelectedPatientId] = useState<string | undefined>(undefined)
 
@@ -66,7 +71,6 @@ export default function Payments() {
     paymentMethodFilter,
     totalRevenue,
     pendingAmount,
-    totalRemainingBalance,
     partialPaymentsCount,
     pendingPaymentsCount,
     paymentMethodStats,
@@ -91,6 +95,24 @@ export default function Payments() {
     loadPayments()
     loadPatients()
   }, [loadPayments, loadPatients])
+
+  useEffect(() => {
+    const loadRemainingCardTotal = async () => {
+      try {
+        const rows = await window.electronAPI.payments.getRemainingBalancePatients()
+        const total = (Array.isArray(rows) ? rows : []).reduce(
+          (sum, row) => sum + Number(row?.remaining_balance || 0),
+          0
+        )
+        setRemainingCardTotal(Number.isFinite(total) ? total : 0)
+      } catch (error) {
+        console.error('Failed to load remaining card total:', error)
+        setRemainingCardTotal(0)
+      }
+    }
+
+    loadRemainingCardTotal()
+  }, [payments])
 
   // Check for pre-selected patient from localStorage
   useEffect(() => {
@@ -173,6 +195,30 @@ export default function Payments() {
     console.log('Add payment clicked')
     setPreSelectedPatientId(undefined) // Clear any pre-selection for manual add
     setShowAddDialog(true)
+  }
+
+  const handleOpenSummaryDialog = async (type: 'unpaid' | 'remaining') => {
+    setDialogType(type)
+    setIsSummaryDialogLoading(true)
+    setDialogData([])
+
+    try {
+      const result = type === 'unpaid'
+        ? await window.electronAPI.payments.getUnpaidPatients()
+        : await window.electronAPI.payments.getRemainingBalancePatients()
+
+      setDialogData(Array.isArray(result) ? result : [])
+    } catch (error) {
+      console.error('Failed to fetch payment summary details:', error)
+      toast({
+        title: 'تعذر تحميل البيانات',
+        description: 'حدث خطأ أثناء جلب تفاصيل المرضى. حاول مرة أخرى.',
+        variant: 'destructive'
+      })
+      setDialogData([])
+    } finally {
+      setIsSummaryDialogLoading(false)
+    }
   }
 
   const clearAllFilters = () => {
@@ -330,7 +376,18 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        <Card className="interactive-card animate-fade-in-up delay-100">
+        <Card
+          className="interactive-card animate-fade-in-up delay-100 cursor-pointer"
+          onClick={() => handleOpenSummaryDialog('unpaid')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleOpenSummaryDialog('unpaid')
+            }
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               {paymentStats.timeFilter.preset === 'all' || (!paymentStats.timeFilter.startDate && !paymentStats.timeFilter.endDate) ? 'المبالغ غير المدفوعة' : 'المبالغ غير المدفوعة المفلترة'}
@@ -353,7 +410,18 @@ export default function Payments() {
           </CardContent>
         </Card>
 
-        <Card className="interactive-card animate-fade-in-up delay-200">
+        {/* <Card
+          className="interactive-card animate-fade-in-up delay-200 cursor-pointer"
+          onClick={() => handleOpenSummaryDialog('remaining')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleOpenSummaryDialog('remaining')
+            }
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               {paymentStats.timeFilter.preset === 'all' || (!paymentStats.timeFilter.startDate && !paymentStats.timeFilter.endDate) ? 'المبالغ المتبقية' : 'المبالغ المتبقية المفلترة'}
@@ -469,9 +537,9 @@ export default function Payments() {
                 // إجمالي المبالغ المتبقية
                 const filteredRemainingBalance = validateAmount(treatmentRemainingBalance + appointmentRemainingBalance + generalRemainingBalance)
 
-                // استخدام البيانات من الـ store للحالة غير المفلترة
+                // استخدم نفس مصدر بيانات نافذة "المبالغ المتبقية" في الوضع العام
                 const isFiltered = paymentStats.timeFilter.startDate && paymentStats.timeFilter.endDate
-                return isFiltered ? formatCurrency(filteredRemainingBalance) : formatCurrency(totalRemainingBalance)
+                return isFiltered ? formatCurrency(filteredRemainingBalance) : formatCurrency(remainingCardTotal)
               })()}
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -521,7 +589,7 @@ export default function Payments() {
               })()}
             </p>
           </CardContent>
-        </Card>
+        </Card> */}
 
         <Card className="interactive-card animate-fade-in-up delay-300">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -702,6 +770,20 @@ export default function Payments() {
           />
         </>
       )}
+
+      <PaymentSummaryDetailDialog
+        open={dialogType !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDialogType(null)
+            setDialogData([])
+          }
+        }}
+        type={dialogType}
+        title={dialogType === 'unpaid' ? 'المبالغ غير المدفوعة' : 'المبالغ المتبقية'}
+        data={dialogData}
+        isLoading={isSummaryDialogLoading}
+      />
     </div>
   )
 }

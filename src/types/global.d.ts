@@ -26,6 +26,8 @@ declare global {
         search: (query: string) => Promise<any[]>
         getByToothTreatment: (toothTreatmentId: string) => Promise<any[]>
         getToothTreatmentSummary: (toothTreatmentId: string) => Promise<any>
+        getUnpaidPatients: () => Promise<any[]>
+        getRemainingBalancePatients: () => Promise<any[]>
       }
       treatments: {
         getAll: () => Promise<any[]>

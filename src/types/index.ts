@@ -99,6 +99,20 @@ export interface PaymentSummary {
   recentPayments: Payment[]
 }
 
+export interface PaymentSummaryDetailRecord {
+  patient_id: string
+  patient_name: string
+  reference_id: string
+  treatment_name: string
+  total_amount: number
+  amount_paid: number
+  remaining_balance: number
+  status: string
+  next_due_date?: string | null
+  payment_method?: string | null
+  source_type?: 'treatment' | 'appointment' | 'installment' | 'payment'
+}
+
 export interface InstallmentPayment {
   id: string
   payment_id: string

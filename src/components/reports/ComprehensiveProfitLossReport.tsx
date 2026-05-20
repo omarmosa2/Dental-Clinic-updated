@@ -456,10 +456,10 @@ export default function ComprehensiveProfitLossReport() {
                 <span className="text-sm text-muted-foreground">المدفوعات الجزئية</span>
                 <CurrencyDisplay amount={revenue.partialPayments} currency={currency} />
               </div>
-              <div className="flex justify-between items-center">
+              {/* <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">المبالغ المتبقية</span>
                 <CurrencyDisplay amount={revenue.remainingBalances} currency={currency} />
-              </div>
+              </div> */}
             </div>
           </CardContent>
         </Card>

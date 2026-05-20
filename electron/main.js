@@ -1080,6 +1080,30 @@ ipcMain.handle('db:payments:getUnpaidTreatments', async (_, patientId) => {
   }
 })
 
+ipcMain.handle('db:payments:getUnpaidPatients', async () => {
+  try {
+    if (databaseService && typeof databaseService.getUnpaidPatients === 'function') {
+      return await databaseService.getUnpaidPatients()
+    }
+    return []
+  } catch (error) {
+    console.error('Error getting unpaid patients:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:payments:getRemainingBalancePatients', async () => {
+  try {
+    if (databaseService && typeof databaseService.getRemainingBalancePatients === 'function') {
+      return await databaseService.getRemainingBalancePatients()
+    }
+    return []
+  } catch (error) {
+    console.error('Error getting remaining balance patients:', error)
+    throw error
+  }
+})
+
 ipcMain.handle('db:payments:createComprehensive', async (_, patientId, totalAmount, paymentData) => {
   try {
     if (databaseService) {

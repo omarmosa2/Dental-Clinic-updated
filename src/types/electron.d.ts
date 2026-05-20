@@ -2,6 +2,7 @@ import {
   Patient,
   Appointment,
   Payment,
+  PaymentSummaryDetailRecord,
   Treatment,
   ToothTreatment,
   TreatmentSession,
@@ -56,6 +57,8 @@ export interface ElectronAPI {
     search: (query: string) => Promise<Payment[]>
     createComprehensive: (patientId: string, totalAmount: number, paymentData: any) => Promise<any>
     getUnpaidTreatments: (patientId: string) => Promise<any[]>
+    getUnpaidPatients: () => Promise<PaymentSummaryDetailRecord[]>
+    getRemainingBalancePatients: () => Promise<PaymentSummaryDetailRecord[]>
   }
 
   // Treatment operations

@@ -329,6 +329,24 @@ ipcMain.handle('db:payments:getUnpaidTreatments', async (_, patientId) => {
   }
 })
 
+ipcMain.handle('db:payments:getUnpaidPatients', async () => {
+  try {
+    return await databaseService.getUnpaidPatients()
+  } catch (error) {
+    console.error('Error getting unpaid patients:', error)
+    throw error
+  }
+})
+
+ipcMain.handle('db:payments:getRemainingBalancePatients', async () => {
+  try {
+    return await databaseService.getRemainingBalancePatients()
+  } catch (error) {
+    console.error('Error getting remaining balance patients:', error)
+    throw error
+  }
+})
+
 // Treatment IPC Handlers
 ipcMain.handle('db:treatments:getAll', async () => {
   return await databaseService.getAllTreatments()

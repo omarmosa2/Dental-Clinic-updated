@@ -36,7 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getByToothTreatment: (toothTreatmentId) => ipcRenderer.invoke('db:payments:getByToothTreatment', toothTreatmentId),
     getToothTreatmentSummary: (toothTreatmentId) => ipcRenderer.invoke('db:payments:getToothTreatmentSummary', toothTreatmentId),
     createComprehensive: (patientId, totalAmount, paymentData) => ipcRenderer.invoke('db:payments:createComprehensive', patientId, totalAmount, paymentData),
-    getUnpaidTreatments: (patientId) => ipcRenderer.invoke('db:payments:getUnpaidTreatments', patientId)
+    getUnpaidTreatments: (patientId) => ipcRenderer.invoke('db:payments:getUnpaidTreatments', patientId),
+    getUnpaidPatients: () => ipcRenderer.invoke('db:payments:getUnpaidPatients'),
+    getRemainingBalancePatients: () => ipcRenderer.invoke('db:payments:getRemainingBalancePatients')
   },
 
   // Treatment operations

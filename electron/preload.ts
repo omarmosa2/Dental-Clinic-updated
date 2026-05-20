@@ -43,6 +43,8 @@ export interface ElectronAPI {
       paymentData: any,
     ) => Promise<any>;
     getUnpaidTreatments: (patientId: string) => Promise<any[]>;
+    getUnpaidPatients: () => Promise<any[]>;
+    getRemainingBalancePatients: () => Promise<any[]>;
   };
 
   // Inventory operations
@@ -340,6 +342,10 @@ const electronAPI: ElectronAPI = {
       ),
     getUnpaidTreatments: (patientId) =>
       ipcRenderer.invoke("db:payments:getUnpaidTreatments", patientId),
+    getUnpaidPatients: () =>
+      ipcRenderer.invoke("db:payments:getUnpaidPatients"),
+    getRemainingBalancePatients: () =>
+      ipcRenderer.invoke("db:payments:getRemainingBalancePatients"),
   },
   treatments: {
     getAll: () => ipcRenderer.invoke("db:treatments:getAll"),
