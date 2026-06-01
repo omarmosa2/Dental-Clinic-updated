@@ -8,7 +8,19 @@
     <!-- Google Fonts - Tajawal (Primary Arabic Font) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@200;300;400;500;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Fallback style if Google Fonts fails to load -->
+    <style>
+      @font-face {
+        font-family: 'Tajawal-Fallback';
+        src: local('Arial'), local('Segoe UI');
+      }
+      body {
+        font-family: 'Tajawal', 'Tajawal-Fallback', Arial, sans-serif;
+      }
+    </style>
     
     <!-- Local Fonts -->
     <link rel="stylesheet" href="/fonts/fonts.css" />
