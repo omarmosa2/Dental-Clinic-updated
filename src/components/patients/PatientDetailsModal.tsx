@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'
-import { Patient, Appointment, Payment, ToothTreatment, Prescription, LabOrder } from '@/types'
+import React, { useState, useEffect, useMemo } from 'react'
+import { Patient, Appointment, Payment, ToothTreatment, Prescription, LabOrder, TreatmentSession } from '@/types'
 import { calculatePatientPaymentSummary } from '@/utils/paymentCalculations'
 import {
   Dialog,
@@ -18,7 +18,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   User,
   Phone,
@@ -46,6 +48,7 @@ import AddPaymentDialog from '@/components/payments/AddPaymentDialog'
 import AddPrescriptionDialog from '@/components/medications/AddPrescriptionDialog'
 import ComprehensivePendingInvoiceDialog from '@/components/payments/ComprehensivePendingInvoiceDialog'
 import { TREATMENT_STATUS_OPTIONS, getTreatmentNameInArabic } from '@/data/teethData'
+import { getAllSessionTypes } from '@/constants/treatmentSessions'
 import { useTreatmentNames } from '@/hooks/useTreatmentNames'
 import { PatientIntegrationService } from '@/services/patientIntegrationService'
 import { PdfService } from '@/services/pdfService'
@@ -72,12 +75,18 @@ export default function PatientDetailsModal({
   const [patientAppointments, setPatientAppointments] = useState<Appointment[]>([])
   const [patientPayments, setPatientPayments] = useState<Payment[]>([])
   const [patientTreatments, setPatientTreatments] = useState<ToothTreatment[]>([])
+  const [patientTreatmentSessions, setPatientTreatmentSessions] = useState<TreatmentSession[]>([])
   const [patientPrescriptions, setPatientPrescriptions] = useState<Prescription[]>([])
   const [patientLabOrders, setPatientLabOrders] = useState<LabOrder[]>([])
   const [isLoadingAppointments, setIsLoadingAppointments] = useState(false)
   const [isLoadingPayments, setIsLoadingPayments] = useState(false)
   const [isLoadingTreatments, setIsLoadingTreatments] = useState(false)
+  const [isLoadingTreatmentSessions, setIsLoadingTreatmentSessions] = useState(false)
   const [isLoadingPrescriptions, setIsLoadingPrescriptions] = useState(false)
+  const [sessionToothFilter, setSessionToothFilter] = useState('all')
+  const [sessionTypeFilter, setSessionTypeFilter] = useState('all')
+  const [sessionDateFromFilter, setSessionDateFromFilter] = useState('')
+  const [sessionDateToFilter, setSessionDateToFilter] = useState('')
 
   // Dialog states
   const [showAddAppointmentDialog, setShowAddAppointmentDialog] = useState(false)
@@ -265,10 +274,16 @@ export default function PatientDetailsModal({
       // دالة لتحميل جميع البيانات بشكل متوازي وآمن
       const loadAllPatientData = async () => {
         try {
+          setSessionToothFilter('all')
+          setSessionTypeFilter('all')
+          setSessionDateFromFilter('')
+          setSessionDateToFilter('')
+
           // تعيين حالة التحميل لجميع الأقسام
           setIsLoadingAppointments(true)
           setIsLoadingPayments(true)
           setIsLoadingTreatments(true)
+          setIsLoadingTreatmentSessions(true)
           setIsLoadingPrescriptions(true)
 
           // تحميل متوازي لجميع البيانات باستخدام Promise.all
@@ -288,11 +303,17 @@ export default function PatientDetailsModal({
           // تصفية المواعيد والمدفوعات من Store (متوفرة بالفعل)
           const filteredAppointments = appointments.filter(apt => apt.patient_id === patient.id)
           const filteredPayments = payments.filter(payment => payment.patient_id === patient.id)
+          const treatmentSessionsFromDB = (await Promise.all(
+            (treatmentsFromDB || []).map((treatment: ToothTreatment) =>
+              window.electronAPI?.treatmentSessions?.getByTreatment?.(treatment.id) || Promise.resolve([])
+            )
+          )).flat()
 
           // تحديث الحالة بعد اكتمال جميع العمليات
           setPatientAppointments(filteredAppointments)
           setPatientPayments(filteredPayments)
           setPatientTreatments(treatmentsFromDB)
+          setPatientTreatmentSessions(treatmentSessionsFromDB)
           setPatientPrescriptions(prescriptionsFromDB)
           setPatientLabOrders(labOrdersFromDB)
 
@@ -303,6 +324,7 @@ export default function PatientDetailsModal({
           setIsLoadingAppointments(false)
           setIsLoadingPayments(false)
           setIsLoadingTreatments(false)
+          setIsLoadingTreatmentSessions(false)
           setIsLoadingPrescriptions(false)
 
         } catch (error) {
@@ -311,6 +333,7 @@ export default function PatientDetailsModal({
           setIsLoadingAppointments(false)
           setIsLoadingPayments(false)
           setIsLoadingTreatments(false)
+          setIsLoadingTreatmentSessions(false)
           setIsLoadingPrescriptions(false)
         }
       }
@@ -319,6 +342,80 @@ export default function PatientDetailsModal({
       loadAllPatientData()
     }
   }, [patient?.id, open, appointments, payments, refreshTreatmentNames])
+
+  const sessionTypeLabelMap = useMemo(() => {
+    return getAllSessionTypes().reduce((acc, type) => {
+      acc[type.value] = type.label
+      return acc
+    }, {} as Record<string, string>)
+  }, [])
+
+  const patientSessionTimeline = useMemo(() => {
+    const treatmentById = new Map(patientTreatments.map(treatment => [treatment.id, treatment]))
+
+    return patientTreatmentSessions
+      .map((session) => {
+        const treatment = treatmentById.get(session.tooth_treatment_id) || session.tooth_treatment
+        return {
+          session,
+          treatment,
+          dateValue: new Date(session.session_date || session.created_at).getTime() || 0
+        }
+      })
+      .sort((a, b) => b.dateValue - a.dateValue)
+  }, [patientTreatmentSessions, patientTreatments])
+
+  const filteredPatientSessionTimeline = useMemo(() => {
+    return patientSessionTimeline.filter(({ session, treatment }) => {
+      const sessionDate = (session.session_date || '').slice(0, 10)
+      const matchesTooth = sessionToothFilter === 'all' || String(treatment?.tooth_number || '') === sessionToothFilter
+      const matchesType =
+        sessionTypeFilter === 'all' ||
+        treatment?.treatment_type === sessionTypeFilter ||
+        session.session_type === sessionTypeFilter
+      const matchesDateFrom = !sessionDateFromFilter || sessionDate >= sessionDateFromFilter
+      const matchesDateTo = !sessionDateToFilter || sessionDate <= sessionDateToFilter
+
+      return matchesTooth && matchesType && matchesDateFrom && matchesDateTo
+    })
+  }, [patientSessionTimeline, sessionToothFilter, sessionTypeFilter, sessionDateFromFilter, sessionDateToFilter])
+
+  const latestSessionByTooth = useMemo(() => {
+    const latestByTooth = new Map<number, (typeof patientSessionTimeline)[number]>()
+
+    patientSessionTimeline.forEach((timelineItem) => {
+      const toothNumber = timelineItem.treatment?.tooth_number
+      if (!toothNumber || latestByTooth.has(toothNumber)) return
+      latestByTooth.set(toothNumber, timelineItem)
+    })
+
+    return Array.from(latestByTooth.entries()).sort(([a], [b]) => a - b)
+  }, [patientSessionTimeline])
+
+  const sessionToothOptions = useMemo(() => {
+    return Array.from(new Map(
+      patientTreatments.map(treatment => [
+        treatment.tooth_number,
+        {
+          toothNumber: treatment.tooth_number,
+          toothName: treatment.tooth_name
+        }
+      ])
+    ).values()).sort((a, b) => a.toothNumber - b.toothNumber)
+  }, [patientTreatments])
+
+  const sessionTreatmentTypeOptions = useMemo(() => {
+    return Array.from(new Set([
+      ...patientTreatments.map(treatment => treatment.treatment_type),
+      ...patientTreatmentSessions.map(session => session.session_type)
+    ].filter((type): type is string => Boolean(type)))).sort()
+  }, [patientTreatments, patientTreatmentSessions])
+
+  const hasActiveSessionFilters =
+    sessionToothFilter !== 'all' ||
+    sessionTypeFilter !== 'all' ||
+    Boolean(sessionDateFromFilter) ||
+    Boolean(sessionDateToFilter)
 
   if (!patient) return null
 
@@ -356,6 +453,15 @@ export default function PatientDetailsModal({
       }
     }
     return { label: status, variant: 'outline' as const }
+  }
+
+  const getSessionStatusBadge = (status: string) => {
+    const statusMap = {
+      planned: { label: 'مخططة', variant: 'outline' as const },
+      completed: { label: 'مكتملة', variant: 'default' as const },
+      cancelled: { label: 'ملغية', variant: 'destructive' as const }
+    }
+    return statusMap[status as keyof typeof statusMap] || { label: status || 'غير محدد', variant: 'outline' as const }
   }
 
   // Event handlers for dialogs
@@ -450,24 +556,28 @@ export default function PatientDetailsModal({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden" dir="rtl">
-          <TabsList className="grid w-full grid-cols-5 rtl-tabs" dir="rtl">
-            <TabsTrigger value="info" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse">
+          <TabsList className="grid w-full grid-cols-6 rtl-tabs h-auto" dir="rtl">
+            <TabsTrigger value="info" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
               <User className="w-4 h-4" />
               معلومات المريض
             </TabsTrigger>
-            <TabsTrigger value="treatments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse">
+            <TabsTrigger value="treatments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
               <Activity className="w-4 h-4" />
               العلاجات ({patientTreatments.length})
             </TabsTrigger>
-            <TabsTrigger value="appointments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse">
+            <TabsTrigger value="treatment-sessions" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
+              <Clock className="w-4 h-4" />
+              جلسات العلاجات ({patientTreatmentSessions.length})
+            </TabsTrigger>
+            <TabsTrigger value="appointments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
               <Calendar className="w-4 h-4" />
               المواعيد ({patientAppointments.length})
             </TabsTrigger>
-            <TabsTrigger value="payments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse">
+            <TabsTrigger value="payments" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
               <DollarSign className="w-4 h-4" />
               المدفوعات ({patientPayments.length})
             </TabsTrigger>
-            <TabsTrigger value="prescriptions" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse">
+            <TabsTrigger value="prescriptions" className="arabic-enhanced flex items-center justify-center gap-2 flex-row-reverse text-xs px-2 py-2">
               <FileText className="w-4 h-4" />
               الوصفات ({patientPrescriptions.length})
             </TabsTrigger>
@@ -843,6 +953,256 @@ export default function PatientDetailsModal({
                     )}
                   </CardContent>
                 </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="treatment-sessions" className="space-y-4 dialog-rtl" dir="rtl">
+              <div className="flex justify-between items-center mb-4" dir="rtl">
+                <h3 className="text-lg font-medium">جلسات العلاجات</h3>
+                <div className="text-sm text-muted-foreground">
+                  {filteredPatientSessionTimeline.length} من {patientTreatmentSessions.length} جلسة
+                </div>
+              </div>
+
+              {isLoadingTreatmentSessions ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="loading-spinner"></div>
+                </div>
+              ) : patientTreatmentSessions.length === 0 ? (
+                <Card className="card-rtl">
+                  <CardContent className="pt-6 card-content" dir="rtl">
+                    <div className="text-center py-8" dir="rtl">
+                      <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                      <h3 className="text-lg font-medium mb-2">لا توجد جلسات علاجية</h3>
+                      <p className="text-muted-foreground mb-4">لم يتم تسجيل أي جلسات علاجية لهذا المريض بعد</p>
+                      <Button
+                        onClick={handleAddTreatment}
+                        className="flex items-center gap-2 mx-auto"
+                        size="sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        الانتقال لإضافة علاج
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4" dir="rtl">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-4 rounded-lg border border-border bg-muted/30">
+                      <div className="text-xs text-muted-foreground mb-1">إجمالي الجلسات</div>
+                      <div className="text-2xl font-bold text-foreground">{patientTreatmentSessions.length}</div>
+                    </div>
+                    <div className="p-4 rounded-lg border border-border bg-muted/30">
+                      <div className="text-xs text-muted-foreground mb-1">الأسنان التي لها جلسات</div>
+                      <div className="text-2xl font-bold text-foreground">{latestSessionByTooth.length}</div>
+                    </div>
+                    <div className="p-4 rounded-lg border border-border bg-muted/30">
+                      <div className="text-xs text-muted-foreground mb-1">آخر جلسة مسجلة</div>
+                      <div className="text-sm font-bold text-foreground">
+                        {patientSessionTimeline[0]?.session.session_date
+                          ? formatDate(patientSessionTimeline[0].session.session_date)
+                          : 'غير محدد'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {latestSessionByTooth.length > 0 && (
+                    <div className="rounded-lg border border-border p-4 bg-background">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <h4 className="text-sm font-semibold">أحدث جلسة لكل سن</h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {latestSessionByTooth.map(([toothNumber, { session, treatment }]) => {
+                          const sessionStatus = getSessionStatusBadge(session.session_status)
+                          const treatmentName = treatment?.treatment_type
+                            ? getTreatmentNameInArabic(treatment.treatment_type)
+                            : '-'
+                          const sessionTitle = session.session_title || sessionTypeLabelMap[session.session_type] || session.session_type || '-'
+
+                          return (
+                            <div key={toothNumber} className="rounded-lg border border-border p-3 bg-muted/20">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="font-medium text-sm">
+                                  السن {toothNumber}
+                                  {treatment?.tooth_name ? ` - ${treatment.tooth_name}` : ''}
+                                </div>
+                                <Badge variant={sessionStatus.variant} className="text-xs">{sessionStatus.label}</Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {formatDate(session.session_date)} - {treatmentName} - {sessionTitle}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="rounded-lg border border-border p-4 bg-muted/20">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-2">السن</label>
+                        <Select value={sessionToothFilter} onValueChange={setSessionToothFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="كل الأسنان" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">كل الأسنان</SelectItem>
+                            {sessionToothOptions.map((tooth) => (
+                              <SelectItem key={tooth.toothNumber} value={String(tooth.toothNumber)}>
+                                السن {tooth.toothNumber}{tooth.toothName ? ` - ${tooth.toothName}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-2">نوع العلاج أو الجلسة</label>
+                        <Select value={sessionTypeFilter} onValueChange={setSessionTypeFilter}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="كل الأنواع" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">كل الأنواع</SelectItem>
+                            {sessionTreatmentTypeOptions.map((type) => (
+                              <SelectItem key={type} value={type}>
+                                {getTreatmentNameInArabic(type) || sessionTypeLabelMap[type] || type}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-2">من تاريخ</label>
+                        <Input
+                          type="date"
+                          value={sessionDateFromFilter}
+                          onChange={(event) => setSessionDateFromFilter(event.target.value)}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-muted-foreground block mb-2">إلى تاريخ</label>
+                        <Input
+                          type="date"
+                          value={sessionDateToFilter}
+                          onChange={(event) => setSessionDateToFilter(event.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    {hasActiveSessionFilters && (
+                      <div className="flex justify-end mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSessionToothFilter('all')
+                            setSessionTypeFilter('all')
+                            setSessionDateFromFilter('')
+                            setSessionDateToFilter('')
+                          }}
+                          className="flex items-center gap-2"
+                        >
+                          <X className="w-4 h-4" />
+                          مسح الفلاتر
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  {filteredPatientSessionTimeline.length === 0 ? (
+                    <Card className="card-rtl">
+                      <CardContent className="pt-6 card-content" dir="rtl">
+                        <div className="text-center py-8" dir="rtl">
+                          <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
+                          <h3 className="text-lg font-medium mb-2">لا توجد جلسات مطابقة</h3>
+                          <p className="text-muted-foreground">غيّر الفلاتر لعرض جلسات أخرى</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="card-rtl">
+                      <CardHeader className="card-header">
+                        <CardTitle className="flex items-center gap-2 text-foreground text-right">
+                          <Clock className="w-5 h-5" />
+                          السجل الزمني لجلسات المريض
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="card-content" dir="rtl">
+                        <div className="overflow-x-auto rounded-lg border border-border" dir="rtl">
+                          <table className="w-full min-w-[980px]">
+                            <thead className="bg-muted">
+                              <tr>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">التاريخ</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">السن</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">نوع العلاج</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">إجراء الجلسة</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">ملاحظات الطبيب</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">الطبيب المسؤول</th>
+                                <th className="px-3 py-2 text-right text-xs font-medium text-muted-foreground">الحالة</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-background divide-y divide-border">
+                              {filteredPatientSessionTimeline.map(({ session, treatment }, index) => {
+                                const sessionStatus = getSessionStatusBadge(session.session_status)
+                                const treatmentName = treatment?.treatment_type
+                                  ? getTreatmentNameInArabic(treatment.treatment_type)
+                                  : '-'
+                                const sessionTitle = session.session_title || sessionTypeLabelMap[session.session_type] || session.session_type || '-'
+                                const doctorNotes = session.notes || session.session_description || treatment?.notes || '-'
+
+                                return (
+                                  <tr key={session.id} className="hover:bg-muted/50 transition-colors">
+                                    <td className="px-3 py-3 text-xs text-foreground whitespace-nowrap">
+                                      <div className="font-medium">{formatDate(session.session_date)}</div>
+                                      <div className="text-muted-foreground">جلسة #{session.session_number || index + 1}</div>
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-foreground">
+                                      <div className="font-medium">
+                                        {treatment?.tooth_number ? `سن ${treatment.tooth_number}` : 'غير محدد'}
+                                      </div>
+                                      {treatment?.tooth_name && (
+                                        <div className="text-muted-foreground">{treatment.tooth_name}</div>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-foreground">
+                                      <div className="font-medium">{treatmentName}</div>
+                                      {treatment?.treatment_category && (
+                                        <div className="text-muted-foreground">{treatment.treatment_category}</div>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-foreground">
+                                      <div className="font-medium">{sessionTitle}</div>
+                                      {session.session_type && (
+                                        <div className="text-muted-foreground">
+                                          {sessionTypeLabelMap[session.session_type] || session.session_type}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-foreground max-w-[220px]">
+                                      <div className="whitespace-pre-wrap break-words">{doctorNotes}</div>
+                                    </td>
+                                    <td className="px-3 py-3 text-xs text-foreground whitespace-nowrap">
+                                      {settings?.doctor_name || 'غير محدد'}
+                                    </td>
+                                    <td className="px-3 py-3 text-xs">
+                                      <Badge variant={sessionStatus.variant} className="text-xs">{sessionStatus.label}</Badge>
+                                    </td>
+                                  </tr>
+                                )
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               )}
             </TabsContent>
 

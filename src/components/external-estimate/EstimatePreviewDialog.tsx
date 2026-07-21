@@ -486,8 +486,8 @@ export default function EstimatePreviewDialog({ open, onOpenChange, estimateData
               </div>
             ) : (
               <>
-                <div className="text-lg font-medium mb-2">مكان ختم العيادة</div>
-                <div className="text-sm">هذا التقدير صالح لمدة محددة ويخضع للتغيير حسب الحالة الفعلية</div>
+                {/* <div className="text-lg font-medium mb-2">مكان ختم العيادة</div>
+                <div className="text-sm">هذا التقدير صالح لمدة محددة ويخضع للتغيير حسب الحالة الفعلية</div> */}
               </>
             )}
           </div>

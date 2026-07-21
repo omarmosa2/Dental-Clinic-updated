@@ -155,7 +155,7 @@ function createWindow() {
     mainWindow.setIcon(appIcon)
   }
 
-  // Set CSP headers for security
+  // Set CSP headers for security - must allow file:// protocol for production asar loading
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
@@ -163,7 +163,7 @@ function createWindow() {
         'Content-Security-Policy': [
           isDev
             ? "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: http://localhost:5173 ws://localhost:5173 https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' http://localhost:5173; style-src 'self' 'unsafe-inline' http://localhost:5173 https://fonts.googleapis.com; img-src 'self' data: blob: http://localhost:5173; font-src 'self' data: http://localhost:5173 https://fonts.gstatic.com;"
-            : "default-src 'self' 'unsafe-inline' data: blob: https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob:; font-src 'self' data: https://fonts.gstatic.com;"
+            : "default-src 'self' 'unsafe-inline' data: blob: file: https://fonts.googleapis.com https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' file:; style-src 'self' 'unsafe-inline' file: https://fonts.googleapis.com; img-src 'self' data: blob: file:; font-src 'self' data: file: https://fonts.gstatic.com;"
         ]
       }
     })
@@ -178,22 +178,17 @@ function createWindow() {
       mainWindow.webContents.openDevTools()
     }, 2000)
   } else {
-    // ✅ تحسين تحميل الإنتاج مع معالجة شاملة للأخطاء
+    // ✅ تحسين تحميل الإنتاج - استخدام file:// URL مع معالجة asar
     const indexPath = join(__dirname, '../dist/index.html')
     console.log('📁 Loading production build from:', indexPath)
 
-    // التحقق من وجود الملف أولاً
     const fs = require('fs')
     if (!fs.existsSync(indexPath)) {
       console.error('❌ index.html not found at:', indexPath)
-      console.log('📂 Available files in dist:')
       try {
         const distPath = join(__dirname, '../dist')
         if (fs.existsSync(distPath)) {
-          const files = fs.readdirSync(distPath)
-          files.forEach(file => console.log('  -', file))
-        } else {
-          console.error('❌ dist directory not found at:', distPath)
+          console.log('📂 Available files in dist:', fs.readdirSync(distPath))
         }
       } catch (err) {
         console.error('❌ Error reading dist directory:', err)
@@ -201,42 +196,16 @@ function createWindow() {
       return
     }
 
-    // تحميل الملف مع معالجة الأخطاء
-    mainWindow.loadFile(indexPath)
+    // تحميل باستخدام file:// URL - يعمل بشكل أفضل مع asar والمسارات النسبية
+    const fileUrl = `file://${indexPath.replace(/\\/g, '/')}`
+    console.log('📄 Loading file URL:', fileUrl)
+
+    mainWindow.loadURL(fileUrl)
       .then(() => {
-        console.log('✅ Successfully loaded index.html')
+        console.log('✅ Successfully loaded production build')
       })
       .catch(err => {
-        console.error('❌ Failed to load index.html:', err)
-        console.log('🔄 Trying alternative loading method...')
-
-        // طريقة بديلة: استخدام file:// URL
-        const fileUrl = `file://${indexPath.replace(/\\/g, '/')}`
-        console.log('🔄 Trying file URL:', fileUrl)
-
-        mainWindow.loadURL(fileUrl)
-          .then(() => {
-            console.log('✅ Successfully loaded with file:// URL')
-          })
-          .catch(urlErr => {
-            console.error('❌ Failed to load with file:// URL:', urlErr)
-            console.log('🔄 Trying data URL fallback...')
-
-            // طريقة أخيرة: تحميل محتوى HTML مباشرة
-            try {
-              const htmlContent = fs.readFileSync(indexPath, 'utf8')
-              const dataUrl = `data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`
-              mainWindow.loadURL(dataUrl)
-                .then(() => {
-                  console.log('✅ Successfully loaded with data URL')
-                })
-                .catch(dataErr => {
-                  console.error('❌ All loading methods failed:', dataErr)
-                })
-            } catch (readErr) {
-              console.error('❌ Failed to read HTML file:', readErr)
-            }
-          })
+        console.error('❌ Failed to load production build:', err)
       })
   }
 

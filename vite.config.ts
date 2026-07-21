@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  base: './', // ✅ مهم جداً للإنتاج
+  base: './', // ✅ Critical for file:// protocol in Electron production
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -15,9 +15,9 @@ export default defineConfig({
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
     assetsDir: 'assets',
-    sourcemap: true, // ✅ تفعيل sourcemap للتشخيص
+    sourcemap: true, // ✅ Enable sourcemap for diagnostics
     minify: 'terser',
-    target: 'esnext', // ✅ تحسين التوافق
+    target: 'esnext',
     commonjsOptions: {
       ignoreTryCatch: false,
       include: [/node_modules/],
@@ -36,7 +36,7 @@ export default defineConfig({
         /^core-js/,
       ],
       output: {
-        // ✅ تحسين تقسيم الملفات
+        // ✅ Ensure predictable chunk naming for production
         manualChunks: {
           vendor: ['react', 'react-dom'],
           ui: [
@@ -50,28 +50,21 @@ export default defineConfig({
           qr: ['qrcode', 'jsbarcode'],
           utils: ['date-fns', 'zustand'],
         },
-        // ✅ تحسين أسماء الملفات
         entryFileNames: 'assets/[name]-[hash].js',
         chunkFileNames: 'assets/[name]-[hash].js',
         assetFileNames: 'assets/[name]-[hash].[ext]',
       },
       onwarn(warning, warn) {
-        // ✅ تجاهل التحذير فقط إذا كان بسبب GlobalSearch
         if (
           warning.code === 'UNRESOLVED_IMPORT' &&
           warning.source &&
           warning.source.includes('globalThis/GlobalSearch')
         ) {
-          console.warn('⚠️ تم تجاهل الاستيراد غير الموجود: globalThis/GlobalSearch')
           return
         }
-
-        // ✅ تجاهل تحذيرات أخرى معتادة
         if (warning.message.includes('core-js')) return
         if (warning.message.includes('define-globalThis-property')) return
         if (warning.message.includes('dynamic import will not move module into another chunk')) return
-
-        // ⛔ التحذيرات الأخرى تُعرض
         warn(warning)
       },
     },
@@ -79,14 +72,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    host: 'localhost', // ✅ تحديد المضيف بوضوح
+    host: 'localhost',
   },
   define: {
     global: 'globalThis',
-    // ✅ إضافة متغيرات بيئة مفيدة
     __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
   },
-  // ✅ تحسين الأداء
   optimizeDeps: {
     include: [
       'react',
@@ -107,3 +98,4 @@ export default defineConfig({
     ],
   },
 })
+

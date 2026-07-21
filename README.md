@@ -1,312 +1,251 @@
-# 🦷 Dental Clinic Management System
-🏥 مثال حقيقي لنظام المدفوعات
-📋 سيناريو واقعي:
-المريض: أحمد محمد
+# Dental Clinic Management - AgorraCode
 
-يحتاج علاج تقويم أسنان
-التكلفة الإجمالية: 15,000 $
-💰 خطة الدفع:
-الزيارة الأولى - الفحص والتشخيص
-الموعد: فحص وأشعة
-التكلفة: 500 $
-المدفوع: 500 $ ✅
-المتبقي: 0 $
-الزيارة الثانية - بداية التقويم
-الموعد: تركيب التقويم
-التكلفة الإجمالية للعلاج: 15,000 $
-الدفعة الأولى: 5,000 $
-إجمالي المدفوع: 5,500 $ (500 + 5,000)
-المتبقي: 9,500 $
-الزيارة الثالثة - متابعة شهرية
-الموعد: تعديل التقويم
-دفعة شهرية: 1,000 $
-إجمالي المدفوع: 6,500 $
-المتبقي: 8,500 $
-وهكذا حتى اكتمال العلاج...
-🎯 مميزات النظام للدكاترة:
-✅ المميزات الإيجابية:
-1. سهولة التتبع
-تلقائي 100%: لا حاجة لحسابات يدوية
-شفافية كاملة: كل شيء واضح ومرئي
-تاريخ مفصل: سجل كامل لكل دفعة
-2. تقليل الأخطاء
-حسابات دقيقة: لا أخطاء حسابية
-تحديث فوري: المبالغ تتحدث تلقائياً
-تحقق ذكي: يمنع الدفع الزائد
-3. توفير الوقت
-إدخال سريع: معظم الحقول تملأ تلقائياً
-أرقام إيصالات: تولد تلقائياً
-تقارير جاهزة: ملخص فوري للمدفوعات
-4. احترافية
-إيصالات منظمة: أرقام فريدة ومنسقة
-تتبع دقيق: لكل دولار مدفوع
-شفافية مع المرضى: كل شيء موثق
-🏆 مقارنة مع الطرق التقليدية:
-📝 الطريقة التقليدية (الورقية):
-❌ حسابات يدوية معرضة للخطأ
-❌ صعوبة في التتبع
-❌ فقدان الأوراق
-❌ وقت أطول في كل معاملة
-❌ صعوبة في إنتاج التقارير
-💻 نظامنا الرقمي:
-✅ حسابات تلقائية دقيقة 100%
-✅ تتبع فوري ومباشر
-✅ حفظ آمن في قاعدة البيانات
-✅ سرعة في المعاملات
-✅ تقارير فورية ومفصلة
-👨‍⚕️ رأي الدكاترة (من خبرتي):
-🎯 ما يحبه الدكاترة:
-1. البساطة
-"أريد أن أركز على المريض، ليس على الحسابات"
-النظام يحل هذه المشكلة تماماً
-2. الدقة
-"لا أريد أخطاء في المدفوعات"
-الحسابات التلقائية تضمن دقة 100%
-3. الشفافية
-"المريض يريد أن يرى أين ذهبت أمواله"
-النظام يوفر شفافية كاملة
-4. التوفير في الوقت
-"كل دقيقة موفرة = مريض إضافي"
-النظام يوفر ساعات أسبوعياً
-📊 إحصائيات مهمة:
-⏰ توفير الوقت:
-قبل: 5-10 دقائق لكل معاملة دفع
-بعد: 1-2 دقيقة لكل معاملة
-التوفير: 70-80% من الوقت
-🎯 تقليل الأخطاء:
-قبل: 5-10% نسبة أخطاء حسابية
-بعد: 0% أخطاء حسابية
-التحسن: 100% دقة
-😊 رضا المرضى:
-شفافية: يرون كل التفاصيل
-إيصالات احترافية: مظهر أنيق
-سرعة: لا انتظار طويل
+نظام مكتبي متكامل لإدارة عيادات الأسنان، مبني باستخدام Electron و React و TypeScript. يركز المشروع على تشغيل العيادة اليومية من مكان واحد: المرضى، المواعيد، العلاجات السنية، المدفوعات، المخابر، الوصفات، المخزون، المصروفات، التقارير، النسخ الاحتياطي، ونظام الترخيص.
 
-A comprehensive, modern dental clinic management system built with Electron, React, and TypeScript. This system provides 100% functional implementation of all essential clinic operations including patient management, appointment scheduling, payment tracking, and automated backup systems.
+> صمم هذا التطبيق ليعمل كتطبيق Desktop محلي، مع قاعدة بيانات SQLite داخل جهاز المستخدم، وواجهة عربية RTL مناسبة لطبيعة العمل داخل العيادات.
 
-## ✨ Features
+## نظرة عامة
 
-### 🏥 **Core Functionality**
-- **Patient Management**: Complete patient records with medical history, allergies, and contact information
-- **Appointment Scheduling**: Interactive calendar with drag-and-drop functionality using React Big Calendar
-- **Payment System**: Multi-method payment tracking (cash, card, bank transfer, insurance, installments)
-- **Treatment Management**: Configurable treatment catalog with pricing and duration
-- **Inventory Management**: Stock tracking with low-stock alerts
-- **Reports & Analytics**: Comprehensive reporting with PDF/Excel export capabilities
+يوفر النظام لوحة تشغيل متكاملة للطبيب أو موظف الاستقبال، مع إدارة دقيقة لسجل المريض وخطة العلاج والمدفوعات المرتبطة بكل علاج أو سن. كما يدعم التقارير المالية، الفواتير، تتبع المخزون، أوامر المخبر، الوصفات الطبية، والتنبيهات الذكية.
 
-### 🔒 **Security & Backup**
-- **Automated Backups**: Hourly, daily, or weekly encrypted backups
-- **Auto-save**: Configurable auto-save intervals (default: 5 minutes)
-- **Data Encryption**: AES encryption for backup files
-- **Integrity Verification**: Checksum validation for backup integrity
+## أهم المميزات
 
-### 🎨 **User Experience**
-- **Modern UI**: Clean, responsive design with dark/light mode support
-- **Real-time Search**: Fuzzy search across patients, appointments, and payments
-- **Interactive Dashboard**: Visual analytics with charts and statistics
-- **Multi-language Support**: Configurable language settings
-- **Accessibility**: Full keyboard navigation and screen reader support
+- إدارة المرضى مع رقم تسلسلي، بيانات تواصل، حالة صحية، حساسية، ملاحظات، وسجل علاجي.
+- جدولة المواعيد وربطها بالمريض والعلاج مع حالات الموعد والتنبيهات.
+- مخطط أسنان تفاعلي يدعم عدة علاجات على السن الواحد مع ألوان وحالات علاجية.
+- جلسات علاج متعددة لكل علاج مع تكلفة ومدة وملاحظات لكل جلسة.
+- مدفوعات تفصيلية مرتبطة بالمريض أو الموعد أو علاج السن، مع تتبع المدفوع والمتبقي.
+- دفعات شاملة يمكن توزيعها على عدة علاجات غير مدفوعة.
+- إدارة المخابر وأوامر المخبر وربطها بالمرضى، المواعيد، الأسنان، والمواد المطلوبة.
+- إدارة الأدوية والوصفات الطبية وربط الوصفات بالمريض والعلاج.
+- إدارة المخزون مع الكميات، الموردين، تواريخ الانتهاء، وحدود التنبيه.
+- إدارة احتياجات العيادة والموردين والمدفوعات الخاصة بها.
+- إدارة مصروفات العيادة التشغيلية وتحليل الربح والخسارة.
+- تقارير مالية وتشغيلية مع إمكانيات تصدير PDF و Excel.
+- بحث عام وتنبيهات ذكية للوصول السريع للبيانات المهمة.
+- إعدادات عيادة قابلة للتخصيص: اسم العيادة، الطبيب، العملة، الشعار، أوقات العمل، النسخ الاحتياطي.
+- نظام حماية بكلمة مرور واستعادة عبر سؤال أمان.
+- نظام ترخيص مرتبط بالجهاز باستخدام معرف الجهاز.
+- نسخ احتياطي واستعادة للبيانات مع خدمات Auto Save.
 
-## 🛠 Technology Stack
+## الواجهات الرئيسية
 
-### **Frontend**
-- **React 18** - Modern React with hooks and functional components
-- **TypeScript** - Type-safe development
-- **Tailwind CSS** - Utility-first CSS framework
-- **Shadcn/ui** - High-quality UI components
-- **React Big Calendar** - Interactive calendar component
-- **Recharts** - Data visualization and charts
-- **Zustand** - Lightweight state management
+- لوحة التحكم
+- المرضى
+- المواعيد
+- المدفوعات
+- العلاجات السنية
+- المخابر
+- طلبات المستودعات واحتياجات العيادة
+- المخزون
+- الأدوية والوصفات
+- مصروفات العيادة
+- التقارير
+- الفاتورة التقديرية الخارجية
+- الإعدادات
 
-### **Backend & Desktop**
-- **Electron** - Cross-platform desktop application
-- **SQLite** - Local database with better-sqlite3
-- **Node.js** - Runtime environment
+## التقنيات المستخدمة
 
-### **Additional Libraries**
-- **jsPDF** - PDF generation
-- **ExcelJS** - Excel file export
-- **Fuse.js** - Fuzzy search functionality
-- **crypto-js** - Encryption and security
-- **archiver** - Backup compression
-- **React Hook Form** - Form management
+| المجال | التقنية |
+| --- | --- |
+| Desktop Runtime | Electron |
+| Frontend | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS, shadcn/ui, Radix UI |
+| State Management | Zustand |
+| Database | SQLite عبر better-sqlite3 |
+| Charts | Recharts |
+| Forms & Validation | React Hook Form, Zod |
+| Export | jsPDF, pdfmake, PDFKit, ExcelJS |
+| Search | Fuse.js |
+| Security | crypto-js, machine-bound licensing |
+| Build | electron-builder, NSIS |
 
-## 📦 Installation
+## متطلبات التشغيل
 
-### Prerequisites
-- Node.js 18+
-- npm or yarn
+- Node.js 18 أو أحدث
+- npm
 - Git
+- Windows 10/11 للبناء بصيغة NSIS
 
-### Setup Instructions
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd dental-clinic-management
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Development mode**
-   ```bash
-   npm run electron:dev
-   ```
-
-4. **Build for production**
-   ```bash
-   npm run electron:build
-   ```
-
-## 🚀 Usage
-
-### **First Launch**
-1. The application will create a local SQLite database automatically
-2. Default clinic settings will be initialized
-3. Sample treatment types will be pre-loaded
-
-### **Patient Management**
-- Add new patients with comprehensive information
-- Search and filter patients by name, phone, or email
-- View detailed patient profiles with medical history
-- Track patient appointments and payment history
-
-### **Appointment Scheduling**
-- Interactive calendar with multiple view modes (month, week, day, agenda)
-- Drag-and-drop appointment rescheduling
-- Color-coded appointment statuses
-- Automatic conflict detection
-
-### **Payment Tracking**
-- Record payments with multiple methods
-- Track installment payments
-- Generate payment receipts
-- Monitor outstanding balances
-
-### **Backup & Security**
-- Automatic encrypted backups
-- Manual backup creation
-- Backup restoration with integrity verification
-- Configurable backup schedules
-
-## 📊 Database Schema
-
-The system uses SQLite with the following main tables:
-- `patients` - Patient information and medical records
-- `appointments` - Appointment scheduling and status
-- `payments` - Payment transactions and methods
-- `treatments` - Available treatments and pricing
-- `inventory` - Stock management
-- `settings` - Clinic configuration
-
-## 🔧 Configuration
-
-### **Clinic Settings**
-- Clinic name, address, and contact information
-- Working hours and days
-- Currency and language preferences
-- Backup frequency and auto-save intervals
-
-### **Environment Variables**
-- `IS_DEV` - Development mode flag
-- Database path is automatically configured in user data directory
-
-## 📈 Development Phases
-
-### ✅ **Phase 1: Infrastructure (Completed)**
-- Database setup and schema
-- Electron main/renderer communication (IPC)
-- State management with Zustand
-- Basic UI components and layout
-
-### ✅ **Phase 2: Patient Management (Completed)**
-- Patient CRUD operations
-- Search and filtering
-- Patient detail views
-- Add patient dialog
-
-### ✅ **Phase 3: Appointment System (Completed)**
-- Interactive calendar integration
-- Appointment scheduling
-- Status management
-- Calendar views and navigation
-
-### 🔄 **Phase 4: Payment System (In Progress)**
-- Payment recording and tracking
-- Multiple payment methods
-- Installment management
-- Payment analytics
-
-### 📋 **Phase 5: Treatments & Inventory (Planned)**
-- Treatment catalog management
-- Inventory tracking
-- Stock alerts
-- Usage reporting
-
-### 📊 **Phase 6: Reports & Analytics (Planned)**
-- Dashboard enhancements
-- Advanced reporting
-- Data export (PDF/Excel/CSV)
-- Performance metrics
-
-### 💾 **Phase 7: Backup & Security (Completed)**
-- Automated backup system
-- Encryption and security
-- Data integrity verification
-- Restore functionality
-
-## 🧪 Testing
+## التثبيت والتشغيل
 
 ```bash
-# Run unit tests
-npm test
-
-# Type checking
-npm run type-check
-
-# Linting
-npm run lint
+git clone <repository-url>
+cd Dental-Clinic-updated
+npm install
 ```
 
-## 📝 Scripts
+تشغيل واجهة الويب أثناء التطوير:
 
-- `npm run dev` - Start Vite development server
-- `npm run electron:dev` - Start Electron in development mode
-- `npm run build` - Build for production
-- `npm run electron:build` - Build Electron application
-- `npm run preview` - Preview production build
+```bash
+npm run dev
+```
 
-## 🤝 Contributing
+تشغيل التطبيق كبرنامج Desktop أثناء التطوير:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+```bash
+npm run electron:dev
+```
 
-## 📄 License
+بناء نسخة الإنتاج:
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+npm run build
+```
 
-## 🆘 Support
+إنشاء مثبت Windows:
 
-For support and questions:
-- Create an issue in the GitHub repository
-- Check the documentation in the `/docs` folder
-- Review the troubleshooting guide
+```bash
+npm run dist:win
+```
 
-## 🔮 Future Enhancements
+إنشاء حزمة لجميع المنصات المدعومة حسب إعدادات `electron-builder`:
 
-- **Multi-clinic Support**: Manage multiple clinic locations
-- **Cloud Sync**: Optional cloud backup and synchronization
-- **Mobile App**: Companion mobile application
-- **API Integration**: Integration with external systems
-- **Advanced Analytics**: Machine learning insights
-- **Telemedicine**: Video consultation features
+```bash
+npm run dist
+```
+
+## أوامر npm المهمة
+
+| الأمر | الوصف |
+| --- | --- |
+| `npm run dev` | تشغيل Vite development server على المنفذ 5173 |
+| `npm run build` | بناء ملفات الواجهة داخل `dist` |
+| `npm run preview` | معاينة نسخة الإنتاج |
+| `npm run electron:dev` | تشغيل Electron مع Vite أثناء التطوير |
+| `npm run electron` | تشغيل Electron مباشرة |
+| `npm run dist:win` | بناء مثبت Windows |
+| `npm run dist:mac` | بناء نسخة macOS |
+| `npm run dist:linux` | بناء نسخة Linux |
+| `npm run clean` | تنظيف مخرجات البناء والكاش |
+
+## بنية المشروع
+
+```text
+.
+├── assets/                 # أيقونات وموارد التطبيق
+├── dist/                   # ناتج بناء Vite
+├── dist-electron/          # نواتج electron-builder
+├── docs/                   # توثيق تفصيلي للميزات والإصلاحات
+├── electron/               # Main process, preload, licensing, IPC
+├── installer/              # ملفات NSIS وإعدادات المثبت
+├── public/                 # ملفات عامة وخطوط عربية
+├── scripts/                # سكربتات ترخيص، هجرة بيانات، تشخيص، وصيانة
+├── src/
+│   ├── components/         # مكونات الواجهة
+│   ├── contexts/           # Theme و Currency providers
+│   ├── database/           # schema.sql و migrations
+│   ├── hooks/              # Hooks مخصصة للتطبيق
+│   ├── pages/              # صفحات النظام الرئيسية
+│   ├── services/           # خدمات قاعدة البيانات، التقارير، النسخ الاحتياطي
+│   ├── store/              # Zustand stores
+│   ├── styles/             # CSS عام
+│   ├── types/              # TypeScript interfaces
+│   └── utils/              # أدوات مساعدة وحسابات وتحقق
+├── package.json
+├── vite.config.ts
+└── README.md
+```
+
+## قاعدة البيانات
+
+يعتمد النظام على SQLite محليا. يتم إنشاء الجداول الأساسية تلقائيا عند تشغيل التطبيق، وتشمل:
+
+- `patients`
+- `appointments`
+- `payments`
+- `tooth_treatments`
+- `treatment_sessions`
+- `tooth_treatment_images`
+- `labs`
+- `lab_orders`
+- `lab_monthly_balances`
+- `medications`
+- `prescriptions`
+- `inventory`
+- `clinic_needs`
+- `clinic_need_payments`
+- `clinic_expenses`
+- `smart_alerts`
+- `settings`
+
+كما يحتوي المخطط على فهارس لتحسين البحث والتقارير، وعلاقات Foreign Keys للحفاظ على ترابط بيانات المريض والعلاج والمدفوعات والمخابر.
+
+## النسخ الاحتياطي والأمان
+
+- حفظ تلقائي للبيانات عبر `AutoSaveService`.
+- نسخ احتياطي مجدول حسب إعدادات العيادة.
+- استعادة النسخ الاحتياطية من داخل التطبيق.
+- حماية بكلمة مرور اختيارية.
+- سؤال أمان لاستعادة الوصول.
+- نظام ترخيص مرتبط بمعرف الجهاز.
+- تخزين البيانات محليا دون الحاجة إلى خادم خارجي.
+
+## التقارير والتصدير
+
+يدعم النظام إنشاء تقارير تشغيلية ومالية، منها:
+
+- تقرير المرضى
+- تقرير المواعيد
+- تقرير المدفوعات
+- تقرير المخزون
+- تقرير احتياجات العيادة
+- تقرير شامل للربح والخسارة
+- فواتير وإيصالات مدفوعات
+- فواتير تقديرية خارجية
+
+وتتوفر إمكانيات تصدير حسب الميزة إلى PDF و Excel و CSV.
+
+## التوزيع
+
+إعدادات التوزيع موجودة داخل `package.json` ضمن `build`:
+
+- Windows: مثبت NSIS بصيغة `.exe`
+- macOS: حزمة DMG
+- Linux: AppImage
+
+اسم المنتج الحالي:
+
+```text
+DentalClinic - agorracode
+```
+
+معرف التطبيق:
+
+```text
+com.agorracode.dentalclinic
+```
+
+## ملاحظات للمطورين
+
+- المنفذ الافتراضي لبيئة التطوير هو `5173`.
+- يستخدم Vite قيمة `base: './'` لدعم تشغيل ملفات الإنتاج عبر Electron.
+- توجد ملفات JavaScript مبنية داخل `electron/` بجانب ملفات TypeScript لضمان تشغيل Electron.
+- توجد سكربتات خاصة بالتراخيص والهجرة والتشخيص داخل `scripts/`.
+- مجلد `docs/` يحتوي تفاصيل إضافية عن ميزات مثل صور الأسنان، تعدد العلاجات، المخابر، التقارير، والنسخ الاحتياطي.
+
+## اختبار سريع قبل التسليم
+
+```bash
+npm install
+npm run build
+npm run electron
+```
+
+لإنشاء نسخة Windows قابلة للتثبيت:
+
+```bash
+npm run dist:win
+```
+
+## الخصوصية
+
+هذا المشروع مصمم ليحفظ بيانات العيادة محليا على جهاز المستخدم. عند نشر المشروع أو رفعه إلى GitHub، تأكد من عدم رفع مفاتيح تراخيص حقيقية أو بيانات مرضى أو نسخ احتياطية إنتاجية.
+
+## الترخيص
+
+هذا المشروع مملوك لفريق AgorraCode أو الجهة المالكة للمستودع. يرجى مراجعة مالك المشروع قبل إعادة الاستخدام أو التوزيع التجاري.
 
 ---
 
-**Built with ❤️ for dental professionals worldwide**
+تم تطويره لخدمة سير العمل اليومي في عيادات الأسنان بواجهة عربية وعمل محلي موثوق.
