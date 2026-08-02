@@ -274,7 +274,6 @@ export const TREATMENT_STATUS_OPTIONS = [
   { value: 'planned', label: 'مخطط', color: '#3b82f6' },
   { value: 'in_progress', label: 'قيد التنفيذ', color: '#eab308' },
   { value: 'completed', label: 'مكتمل', color: '#22c55e' },
-  { value: 'cancelled', label: 'ملغي', color: '#6b7280' },
 ] as const
 
 // Image type options

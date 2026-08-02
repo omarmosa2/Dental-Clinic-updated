@@ -14,6 +14,7 @@
     "rebuild": "npx @electron/rebuild -f -w",
     "postinstall": "electron-builder install-app-deps",
     "test": "echo \"No tests specified\"",
+    "verify:financial": "node src/scripts/verify-financial-consistency.js",
     "install-deps": "npm install vite @vitejs/plugin-react react react-dom typescript",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",
