@@ -1,5 +1,6 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, BrowserWindow, ipcMain, dialog, nativeImage } from 'electron'
 import { join } from 'path'
+import { existsSync } from 'fs'
 import { DatabaseService } from '../src/services/databaseService'
 import { DataMigrationService } from '../src/services/dataMigrationService'
 import { BackupService } from '../src/services/backupService'
@@ -7,6 +8,14 @@ import { AutoSaveService } from '../src/services/autoSaveService'
 import { ReportsService } from '../src/services/reportsService'
 
 const isDev = process.env.IS_DEV === 'true' || process.env.NODE_ENV === 'development'
+const USER_DATA_DIR_NAME = 'dental-clinic-management-aggoracode'
+const APP_USER_MODEL_ID = isDev ? 'com.agorracode.dentalclinic.dev.branded' : 'com.agorracode.dentalclinic'
+
+if (process.platform === 'win32') {
+  app.setPath('userData', join(app.getPath('appData'), USER_DATA_DIR_NAME))
+  app.setName(isDev ? 'DentalClinic - agorracode Dev' : 'DentalClinic - agorracode')
+  app.setAppUserModelId(APP_USER_MODEL_ID)
+}
 
 let mainWindow: BrowserWindow | null = null
 let databaseService: DatabaseService
@@ -15,9 +24,14 @@ let autoSaveService: AutoSaveService
 let reportsService: ReportsService
 
 function createWindow(): void {
-  const iconPath = isDev
-    ? join(__dirname, '../assets/icon.ico')
-    : join(process.resourcesPath, 'assets', 'icon.ico')
+  const iconPathCandidates = [
+    isDev ? join(__dirname, '../public/icon.png') : join(process.resourcesPath, 'assets', 'icon.ico'),
+    join(__dirname, '../assets/icon.ico'),
+    join(process.cwd(), 'assets', 'icon.ico'),
+    join(process.cwd(), 'public', 'icon.png'),
+  ]
+  const resolvedIconPath = iconPathCandidates.find((candidate) => existsSync(candidate)) || iconPathCandidates[0]
+  const appIcon = nativeImage.createFromPath(resolvedIconPath)
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -30,10 +44,14 @@ function createWindow(): void {
       contextIsolation: true,
       enableRemoteModule: false,
     },
-    icon: iconPath,
+    icon: appIcon.isEmpty() ? resolvedIconPath : appIcon,
     titleBarStyle: 'default',
     show: false,
   })
+
+  if (process.platform === 'win32' && !appIcon.isEmpty()) {
+    mainWindow.setIcon(appIcon)
+  }
 
   // Load the app
   if (isDev) {

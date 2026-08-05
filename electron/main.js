@@ -1,11 +1,16 @@
 const { app, BrowserWindow, ipcMain, dialog, shell, Menu, nativeImage } = require('electron')
 const path = require('path')
 const { join } = path
-const APP_USER_MODEL_ID = 'com.agorracode.dentalclinic'
+const USER_DATA_DIR_NAME = 'dental-clinic-management-aggoracode'
+const APP_USER_MODEL_ID = (process.env.IS_DEV === 'true' || process.env.NODE_ENV === 'development' || !app.isPackaged)
+  ? 'com.agorracode.dentalclinic.dev.branded'
+  : 'com.agorracode.dentalclinic'
 
 // ✅ تعيين App User Model ID لنظام Windows (يجب أن يكون قبل جاهزية التطبيق)
 // هذا يحل مشكلة ظهور أيقونة Electron الافتراضية على سطح المكتب
 if (process.platform === 'win32') {
+  app.setPath('userData', join(app.getPath('appData'), USER_DATA_DIR_NAME))
+  app.setName(APP_USER_MODEL_ID.includes('.dev') ? 'DentalClinic - agorracode Dev' : 'DentalClinic - agorracode')
   app.setAppUserModelId(APP_USER_MODEL_ID)
 }
 
@@ -96,13 +101,15 @@ function createWindow() {
 
   const fs = require('fs')
   const resolvedIconPathCandidates = [
+    isDev ? join(__dirname, '../public/icon.png') : join(process.resourcesPath, 'assets', 'icon.ico'),
     iconPath,
     join(app.getAppPath(), 'assets', 'icon.ico'),
     join(process.cwd(), 'assets', 'icon.ico'),
+    join(process.cwd(), 'public', 'icon.png'),
     join(__dirname, '../assets/icon.ico'),
     join(process.resourcesPath, 'assets', 'icon.ico')
   ]
-  const resolvedIconPath = resolvedIconPathCandidates.find(candidate => fs.existsSync(candidate)) || iconPath
+  const resolvedIconPath = resolvedIconPathCandidates.find(candidate => fs.existsSync(candidate)) || resolvedIconPathCandidates[0]
   const appIcon = nativeImage.createFromPath(resolvedIconPath)
 
   if (appIcon.isEmpty()) {

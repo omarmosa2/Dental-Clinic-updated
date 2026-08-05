@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron:dev": "concurrently \"npm run dev\" \"cross-env NODE_ENV=development electron .\"",
+    "electron:dev": "concurrently \"npm run dev\" \"node scripts/runBrandedElectronDev.js\"",
     "electron": "electron .",
     "electron:build": "npm run build && electron .",
     "rebuild": "npx @electron/rebuild -f -w",
@@ -130,7 +130,7 @@
       "icon": "assets/icon.ico",
       "requestedExecutionLevel": "asInvoker",
       "forceCodeSigning": false,
-      "signAndEditExecutable": false
+      "signAndEditExecutable": true
     },
     "nsis": {
       "include": "installer/nsis-custom.nsi",
