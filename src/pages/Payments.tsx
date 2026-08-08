@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,6 +14,7 @@ import { usePatientStore } from '@/store/patientStore'
 import { useToast } from '@/hooks/use-toast'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { getCardStyles, getIconStyles } from '@/lib/cardStyles'
+import { getTransactionAmount, isRevenuePaymentStatus } from '@/utils/paymentCalculations'
 import { useRealTimeSync } from '@/hooks/useRealTimeSync'
 import { useRealTimeTableSync } from '@/hooks/useRealTimeTableSync'
 import TimeFilter, { TimeFilterOptions } from '@/components/ui/time-filter'
@@ -52,7 +53,7 @@ export default function Payments() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showReceiptDialog, setShowReceiptDialog] = useState(false)
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
-  const [dialogType, setDialogType] = useState<'unpaid' | 'remaining' | null>(null)
+  const [dialogType, setDialogType] = useState<'unpaid' | 'remaining' | 'paid' | null>(null)
   const [dialogData, setDialogData] = useState<PaymentSummaryDetailRecord[]>([])
   const [isSummaryDialogLoading, setIsSummaryDialogLoading] = useState(false)
   const [remainingCardTotal, setRemainingCardTotal] = useState(0)
@@ -90,6 +91,49 @@ export default function Payments() {
     dateField: 'payment_date',
     initialFilter: { preset: 'all', startDate: '', endDate: '' } // Show all data by default
   })
+
+  const paidSummaryData = useMemo<PaymentSummaryDetailRecord[]>(() => {
+    const isTimeFiltered = Boolean(paymentStats.timeFilter.startDate && paymentStats.timeFilter.endDate)
+    const sourcePayments = isTimeFiltered ? paymentStats.filteredData : payments
+    const patientNames = new Map(patients.map(patient => [patient.id, patient.full_name]))
+    const groupedByPatient = new Map<string, PaymentSummaryDetailRecord>()
+
+    sourcePayments
+      .filter(payment => isRevenuePaymentStatus(payment.status))
+      .forEach(payment => {
+        const paidAmount = getTransactionAmount(payment)
+        if (paidAmount <= 0) return
+
+        const patientId = payment.patient_id || 'unknown'
+        const existing = groupedByPatient.get(patientId)
+        const patientName =
+          patientNames.get(patientId) ||
+          payment.patient?.full_name ||
+          'غير محدد'
+
+        if (existing) {
+          existing.total_amount += paidAmount
+          existing.amount_paid += paidAmount
+          return
+        }
+
+        groupedByPatient.set(patientId, {
+          patient_id: patientId,
+          patient_name: patientName,
+          reference_id: patientId,
+          treatment_name: '',
+          total_amount: paidAmount,
+          amount_paid: paidAmount,
+          remaining_balance: 0,
+          status: 'paid',
+          payment_method: null,
+          source_type: 'payment'
+        })
+      })
+
+    return Array.from(groupedByPatient.values())
+      .sort((a, b) => b.amount_paid - a.amount_paid)
+  }, [patients, paymentStats.filteredData, paymentStats.timeFilter.endDate, paymentStats.timeFilter.startDate, payments])
 
   useEffect(() => {
     loadPayments()
@@ -197,10 +241,17 @@ export default function Payments() {
     setShowAddDialog(true)
   }
 
-  const handleOpenSummaryDialog = async (type: 'unpaid' | 'remaining') => {
+  const handleOpenSummaryDialog = async (type: 'unpaid' | 'remaining' | 'paid') => {
     setDialogType(type)
-    setIsSummaryDialogLoading(true)
     setDialogData([])
+
+    if (type === 'paid') {
+      setDialogData(paidSummaryData)
+      setIsSummaryDialogLoading(false)
+      return
+    }
+
+    setIsSummaryDialogLoading(true)
 
     try {
       const result = type === 'unpaid'
@@ -345,7 +396,18 @@ export default function Payments() {
 
       {/* Statistics Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 stagger-children">
-        <Card className="interactive-card animate-fade-in-up">
+        <Card
+          className="interactive-card animate-fade-in-up cursor-pointer"
+          onClick={() => handleOpenSummaryDialog('paid')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              handleOpenSummaryDialog('paid')
+            }
+          }}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xs sm:text-sm font-medium text-muted-foreground">
               {paymentStats.timeFilter.preset === 'all' || (!paymentStats.timeFilter.startDate && !paymentStats.timeFilter.endDate) ? 'إجمالي الإيرادات' : 'الإيرادات المفلترة'}
@@ -780,7 +842,7 @@ export default function Payments() {
           }
         }}
         type={dialogType}
-        title={dialogType === 'unpaid' ? 'المبالغ غير المدفوعة' : 'المبالغ المتبقية'}
+        title={dialogType === 'paid' ? 'المبالغ المدفوعة' : dialogType === 'unpaid' ? 'المبالغ غير المدفوعة' : 'المبالغ المتبقية'}
         data={dialogData}
         isLoading={isSummaryDialogLoading}
       />

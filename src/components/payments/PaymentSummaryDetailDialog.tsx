@@ -6,20 +6,30 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency } from '@/lib/utils'
-import { AlertTriangle, Clock, Loader2, Users } from 'lucide-react'
+import { AlertTriangle, Clock, DollarSign, Loader2, Users } from 'lucide-react'
 import type { PaymentSummaryDetailRecord } from '@/types'
+
+type PaymentSummaryDialogType = 'unpaid' | 'remaining' | 'paid'
 
 interface PaymentSummaryDetailDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  type: 'unpaid' | 'remaining' | null
+  type: PaymentSummaryDialogType | null
   title: string
   data: PaymentSummaryDetailRecord[]
   isLoading: boolean
 }
 
-const getStatusBadge = (status: string, type: 'unpaid' | 'remaining') => {
+const getStatusBadge = (status: string, type: PaymentSummaryDialogType) => {
   const normalized = (status || '').toLowerCase()
+
+  if (type === 'paid') {
+    return (
+      <Badge className="min-w-20 justify-center whitespace-nowrap border-emerald-200 bg-emerald-100 px-3 py-1 text-emerald-700 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+        مدفوع
+      </Badge>
+    )
+  }
 
   if (type === 'unpaid') {
     if (normalized === 'unpaid' || normalized === 'pending') {
@@ -60,7 +70,7 @@ export default function PaymentSummaryDetailDialog({
     }),
     { total: 0, paid: 0, remaining: 0 }
   )
-  const HeaderIcon = type === 'remaining' ? Clock : AlertTriangle
+  const HeaderIcon = type === 'paid' ? DollarSign : type === 'remaining' ? Clock : AlertTriangle
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -79,7 +89,9 @@ export default function PaymentSummaryDetailDialog({
                 {title}
               </DialogTitle>
               <DialogDescription className="mt-1 text-right text-sm leading-6 text-muted-foreground sm:text-base">
-                {type === 'unpaid'
+                {type === 'paid'
+                  ? 'عرض ملخص المبالغ المدفوعة حسب المرضى'
+                  : type === 'unpaid'
                   ? 'عرض المرضى الذين لديهم مبالغ غير مدفوعة'
                   : 'عرض المرضى الذين لديهم مبالغ متبقية أو أقساط'}
               </DialogDescription>
@@ -107,12 +119,6 @@ export default function PaymentSummaryDetailDialog({
                 <p className="text-xs font-medium text-muted-foreground">المدفوع</p>
                 <p className="mt-2 text-left text-lg font-bold text-emerald-600 dark:text-emerald-400" dir="ltr">
                   {formatCurrency(summary.paid)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-card px-4 py-3">
-                <p className="text-xs font-medium text-muted-foreground">المتبقي</p>
-                <p className="mt-2 text-left text-lg font-bold text-orange-600 dark:text-orange-400" dir="ltr">
-                  {formatCurrency(summary.remaining)}
                 </p>
               </div>
             </div>
