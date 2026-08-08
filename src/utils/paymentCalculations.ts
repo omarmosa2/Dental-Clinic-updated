@@ -1,5 +1,19 @@
 import { Payment, Appointment } from '@/types'
 
+export function isRevenuePaymentStatus(status?: Payment['status'] | string | null): boolean {
+  return status === 'completed' || status === 'partial' || status === 'paid'
+}
+
+export function getTransactionAmount(payment: Payment): number {
+  const value = payment.total_amount ?? payment.amount ?? 0
+  const amount = Number(value)
+  return isNaN(amount) || !isFinite(amount) || amount < 0 ? 0 : Math.round(amount * 100) / 100
+}
+
+export function getRevenueTransactionAmount(payment: Payment): number {
+  return isRevenuePaymentStatus(payment.status) ? getTransactionAmount(payment) : 0
+}
+
 /**
  * حساب إجمالي المدفوعات لموعد محدد (فقط من الدفعات الجزئية والمكتملة)
  */
@@ -9,9 +23,9 @@ export function calculateAppointmentTotalPaid(appointmentId: string, payments: P
   return payments
     .filter(payment =>
       payment.appointment_id === appointmentId &&
-      (payment.status === 'partial' || payment.status === 'completed')
+      isRevenuePaymentStatus(payment.status)
     )
-    .reduce((total, payment) => total + payment.amount, 0)
+    .reduce((total, payment) => total + getTransactionAmount(payment), 0)
 }
 
 /**
@@ -35,9 +49,9 @@ export function calculateTreatmentTotalPaid(treatmentId: string, payments: Payme
   return payments
     .filter(payment =>
       payment.tooth_treatment_id === treatmentId &&
-      (payment.status === 'partial' || payment.status === 'completed')
+      isRevenuePaymentStatus(payment.status)
     )
-    .reduce((total, payment) => total + payment.amount, 0)
+    .reduce((total, payment) => total + getTransactionAmount(payment), 0)
 }
 
 /**

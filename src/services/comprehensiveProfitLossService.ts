@@ -8,6 +8,7 @@ import type {
   ComprehensiveProfitLossReport,
   ReportFilter
 } from '@/types'
+import { getTransactionAmount } from '@/utils/paymentCalculations'
 
 /**
  * خدمة حساب التقرير الشامل للأرباح والخسائر
@@ -88,14 +89,14 @@ export class ComprehensiveProfitLossService {
   private static calculateRevenueStats(payments: Payment[]) {
     const completedPayments = this.validateAmount(
       payments
-        .filter(p => p.status === 'completed')
-        .reduce((sum, p) => sum + this.validateAmount(p.total_amount || p.amount), 0)
+        .filter(p => p.status === 'completed' || p.status === 'paid')
+        .reduce((sum, p) => sum + getTransactionAmount(p), 0)
     )
 
     const partialPayments = this.validateAmount(
       payments
         .filter(p => p.status === 'partial')
-        .reduce((sum, p) => sum + this.validateAmount(p.total_amount || p.amount), 0)
+        .reduce((sum, p) => sum + getTransactionAmount(p), 0)
     )
 
     const totalRevenue = completedPayments + partialPayments
@@ -131,8 +132,9 @@ export class ComprehensiveProfitLossService {
 
           if (payment.tooth_treatment_id) {
             // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
+            const treatmentRemaining = this.validateAmount(payment.treatment_remaining_balance || payment.remaining_balance)
             const treatmentCost = this.validateAmount(payment.treatment_total_cost) || totalAmountDue
-            pendingAmount = treatmentCost
+            pendingAmount = treatmentRemaining > 0 ? treatmentRemaining : treatmentCost
           } else if (amount === 0 && totalAmountDue > 0) {
             // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
             pendingAmount = totalAmountDue

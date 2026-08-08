@@ -1043,11 +1043,7 @@ ipcMain.handle('db:payments:getToothTreatmentSummary', async (_, toothTreatmentI
 ipcMain.handle('db:payments:getUnpaidTreatments', async (_, patientId) => {
   try {
     if (databaseService) {
-      const treatments = await databaseService.getToothTreatmentsByPatient(patientId)
-      return treatments.filter((t) => (t.cost || 0) > (t.total_paid || 0)).map((t) => ({
-        ...t,
-        remaining_balance: (t.cost || 0) - (t.total_paid || 0)
-      }))
+      return await databaseService.getUnpaidToothTreatmentsByPatient(patientId)
     }
     return []
   } catch (error) {

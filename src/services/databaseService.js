@@ -6521,12 +6521,47 @@ async getToothTreatmentsByPatient(patientId) {
     }
   }
 
+  async getUnpaidToothTreatmentsByPatient(patientId) {
+    try {
+      this.ensureToothTreatmentsTableExists()
+      this.ensurePaymentsColumns()
+
+      const stmt = this.db.prepare(`
+        WITH treatment_paid AS (
+          SELECT
+            tooth_treatment_id,
+            COALESCE(SUM(COALESCE(total_amount, amount, 0)), 0) as total_paid
+          FROM payments
+          WHERE status IN ('completed', 'partial', 'paid')
+            AND tooth_treatment_id IS NOT NULL
+          GROUP BY tooth_treatment_id
+        )
+        SELECT tt.*,
+               a.title as appointment_title,
+               a.start_time as appointment_start_time,
+               COALESCE(tp.total_paid, 0) as total_paid,
+               MAX(COALESCE(tt.cost, 0) - COALESCE(tp.total_paid, 0), 0) as remaining_balance
+        FROM tooth_treatments tt
+        LEFT JOIN appointments a ON tt.appointment_id = a.id
+        LEFT JOIN treatment_paid tp ON tp.tooth_treatment_id = tt.id
+        WHERE tt.patient_id = ?
+          AND COALESCE(tt.cost, 0) > COALESCE(tp.total_paid, 0)
+        ORDER BY remaining_balance ASC, tt.tooth_number ASC, tt.priority ASC
+      `)
+
+      return stmt.all(patientId)
+    } catch (error) {
+      console.error('Error getting unpaid tooth treatments by patient:', error)
+      return []
+    }
+  }
+
   async createComprehensivePayment(patientId, totalAmount, paymentData) {
     const now = new Date().toISOString()
     const discountAmount = paymentData.discount_amount || 0
     const taxAmount = paymentData.tax_amount || 0
     this.validatePaymentAmounts(totalAmount, discountAmount, taxAmount)
-    const amountToDistribute = totalAmount
+    let amountToDistribute = totalAmount
     const batchId = require('uuid').v4()
 
     try {
@@ -6535,11 +6570,11 @@ async getToothTreatmentsByPatient(patientId) {
 
         const unpaidTreatments = this.db.prepare(`
           SELECT tt.*,
-            COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0) as total_paid,
-            tt.cost - COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0) as remaining_balance
+            COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0) as total_paid,
+            tt.cost - COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0) as remaining_balance
           FROM tooth_treatments tt
           WHERE tt.patient_id = ?
-          AND tt.cost > COALESCE((SELECT COALESCE(SUM(p.amount), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial')), 0)
+          AND tt.cost > COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0)
           ORDER BY remaining_balance ASC
         `).all(patientId)
 
@@ -6558,7 +6593,7 @@ async getToothTreatmentsByPatient(patientId) {
         }
 
         if (amountToDistribute > totalRemaining) {
-          throw new Error(`Comprehensive payment amount exceeds total remaining balance (${totalRemaining})`)
+          amountToDistribute = totalRemaining
         }
 
         let remainingToDistribute = amountToDistribute
@@ -6608,7 +6643,18 @@ async getToothTreatmentsByPatient(patientId) {
           remainingToDistribute -= amountForThisTreatment
         }
 
-        this.db.prepare('DELETE FROM payments WHERE patient_id = ? AND tooth_treatment_id IS NOT NULL AND status = ? AND is_comprehensive = 0').run(patientId, 'pending')
+        const clearCoveredPendingStmt = this.db.prepare(`
+          DELETE FROM payments
+          WHERE patient_id = ?
+            AND tooth_treatment_id = ?
+            AND status = 'pending'
+            AND is_comprehensive = 0
+        `)
+
+        distribution
+          .filter(item => item.newRemainingBalance <= 0)
+          .forEach(item => clearCoveredPendingStmt.run(patientId, item.treatmentId))
+
         touchedTreatmentIds.forEach(treatmentId => {
           this.updateToothTreatmentPaymentCalculationsSync(treatmentId)
         })

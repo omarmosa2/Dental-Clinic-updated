@@ -4,6 +4,7 @@ import ExcelJS from 'exceljs'
 import type { Patient, Appointment, Payment, Lab, LabOrder, ReportExportOptions, PatientReportData, AppointmentReportData, FinancialReportData, InventoryReportData } from '../types'
 import { formatCurrency, formatDate, getDefaultCurrency } from '../lib/utils'
 import { getTreatmentNameInArabic, getCategoryNameInArabic } from '../data/teethData'
+import { getTransactionAmount, isRevenuePaymentStatus } from '@/utils/paymentCalculations'
 
 export class ExportService {
   // Generate descriptive filename with date and time in DD-MM-YYYY format
@@ -3007,21 +3008,21 @@ export class ExportService {
   static async exportPaymentsToPDF(payments: Payment[], clinicName: string = 'عيادة الأسنان الحديثة'): Promise<void> {
     // Calculate statistics from the provided payments array (which should be filtered)
     // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-    const totalRevenue = payments.reduce((sum, p) => {
-      return sum + Number(p.amount)
+    const totalRevenue = payments.filter(p => isRevenuePaymentStatus(p.status)).reduce((sum, p) => {
+      return sum + getTransactionAmount(p)
     }, 0)
 
-    const completedPayments = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0)
+    const completedPayments = payments.filter(p => p.status === 'completed' || p.status === 'paid').reduce((sum, p) => sum + getTransactionAmount(p), 0)
     const partialPayments = payments.filter(p => p.status === 'partial').reduce((sum, p) => {
       // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-      return sum + Number(p.amount)
+      return sum + getTransactionAmount(p)
     }, 0)
-    const pendingPayments = payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount), 0)
-    const overduePayments = payments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + Number(p.amount), 0)
+    const pendingPayments = payments.filter(p => p.status === 'pending').reduce((sum, p) => sum + getTransactionAmount(p), 0)
+    const overduePayments = payments.filter(p => p.status === 'overdue').reduce((sum, p) => sum + getTransactionAmount(p), 0)
 
     // Calculate payment method statistics
     const paymentMethods = payments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .reduce((acc, payment) => {
         const method = payment.payment_method || 'غير محدد'
         if (!acc[method]) {
@@ -3029,7 +3030,7 @@ export class ExportService {
         }
         acc[method].count++
         // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-        const amount = Number(payment.amount)
+        const amount = getTransactionAmount(payment)
         acc[method].amount += amount
         return acc
       }, {} as Record<string, { count: number; amount: number }>)
@@ -3269,14 +3270,14 @@ export class ExportService {
   static async exportPaymentsToExcel(payments: Payment[]): Promise<void> {
     // Calculate statistics from the provided payments array (which should be filtered)
     // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-    const totalRevenue = payments.reduce((sum, p) => {
-      return sum + Number(p.amount)
+    const totalRevenue = payments.filter(p => isRevenuePaymentStatus(p.status)).reduce((sum, p) => {
+      return sum + getTransactionAmount(p)
     }, 0)
 
-    const completedPayments = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0)
+    const completedPayments = payments.filter(p => p.status === 'completed' || p.status === 'paid').reduce((sum, p) => sum + getTransactionAmount(p), 0)
     const partialPayments = payments.filter(p => p.status === 'partial').reduce((sum, p) => {
       // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-      return sum + Number(p.amount)
+      return sum + getTransactionAmount(p)
     }, 0)
 
     // Calculate pending and overdue payments using the same logic as useTimeFilteredStats
@@ -3290,7 +3291,7 @@ export class ExportService {
         return paymentDate >= thirtyDaysAgo
       })
       .reduce((sum, p) => {
-        const amount = Number(p.amount) || 0
+        const amount = getTransactionAmount(p)
         const totalAmountDue = Number(p.total_amount_due) || 0
 
         // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
@@ -3306,7 +3307,7 @@ export class ExportService {
         return paymentDate < thirtyDaysAgo
       })
       .reduce((sum, p) => {
-        const amount = Number(p.amount) || 0
+        const amount = getTransactionAmount(p)
         const totalAmountDue = Number(p.total_amount_due) || 0
 
         // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
@@ -3317,7 +3318,7 @@ export class ExportService {
 
     // Calculate payment method statistics
     const paymentMethods = payments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .reduce((acc, payment) => {
         const method = payment.payment_method || 'غير محدد'
         if (!acc[method]) {
@@ -3325,7 +3326,7 @@ export class ExportService {
         }
         acc[method].count++
         // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-        const amount = Number(payment.amount)
+        const amount = getTransactionAmount(payment)
         acc[method].amount += amount
         return acc
       }, {} as Record<string, { count: number; amount: number }>)
@@ -3399,14 +3400,14 @@ export class ExportService {
   static async exportPaymentsToCSV(payments: Payment[]): Promise<void> {
     // Calculate statistics from the provided payments array (which should be filtered)
     // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-    const totalRevenue = payments.reduce((sum, p) => {
-      return sum + Number(p.amount)
+    const totalRevenue = payments.filter(p => isRevenuePaymentStatus(p.status)).reduce((sum, p) => {
+      return sum + getTransactionAmount(p)
     }, 0)
 
-    const completedPayments = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + Number(p.amount), 0)
+    const completedPayments = payments.filter(p => p.status === 'completed' || p.status === 'paid').reduce((sum, p) => sum + getTransactionAmount(p), 0)
     const partialPayments = payments.filter(p => p.status === 'partial').reduce((sum, p) => {
       // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-      return sum + Number(p.amount)
+      return sum + getTransactionAmount(p)
     }, 0)
 
     // Calculate pending and overdue payments using the same logic as useTimeFilteredStats
@@ -3420,7 +3421,7 @@ export class ExportService {
         return paymentDate >= thirtyDaysAgo
       })
       .reduce((sum, p) => {
-        const amount = Number(p.amount) || 0
+        const amount = getTransactionAmount(p)
         const totalAmountDue = Number(p.total_amount_due) || 0
 
         // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
@@ -3436,7 +3437,7 @@ export class ExportService {
         return paymentDate < thirtyDaysAgo
       })
       .reduce((sum, p) => {
-        const amount = Number(p.amount) || 0
+        const amount = getTransactionAmount(p)
         const totalAmountDue = Number(p.total_amount_due) || 0
 
         // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
@@ -3447,7 +3448,7 @@ export class ExportService {
 
     // Calculate payment method statistics
     const paymentMethods = payments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .reduce((acc, payment) => {
         const method = payment.payment_method || 'غير محدد'
         if (!acc[method]) {
@@ -3455,7 +3456,7 @@ export class ExportService {
         }
         acc[method].count++
         // استخدام amount (مبلغ الدفعة الحالية) وليس amount_paid (إجمالي المدفوع للموعد)
-        const amount = Number(payment.amount)
+        const amount = getTransactionAmount(payment)
         acc[method].amount += amount
         return acc
       }, {} as Record<string, { count: number; amount: number }>)

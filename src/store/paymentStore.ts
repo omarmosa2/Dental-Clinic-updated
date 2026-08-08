@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { Payment } from '../types'
-import { calculateTotalRemainingBalanceForAllPatients } from '../utils/paymentCalculations'
+import { getRevenueTransactionAmount, getTransactionAmount, isRevenuePaymentStatus } from '../utils/paymentCalculations'
 import { SmartAlertsService } from '@/services/smartAlertsService'
 
 interface PaymentState {
@@ -68,6 +68,17 @@ type PaymentStore = PaymentState & PaymentActions
 export const usePaymentStore = create<PaymentStore>()(
   devtools(
     (set, get) => {
+      const recalculateAnalytics = () => {
+        get().calculateTotalRevenue()
+        get().calculatePendingAmount()
+        get().calculateTotalRemainingBalance()
+        get().calculatePartialPaymentsCount()
+        get().calculatePendingPaymentsCount()
+        get().calculateMonthlyRevenue()
+        get().calculatePaymentMethodStats()
+        get().filterPayments()
+      }
+
       // Listen for patient deletion events to update payments
       if (typeof window !== 'undefined') {
         window.addEventListener('patient-deleted', (event: any) => {
@@ -82,8 +93,10 @@ export const usePaymentStore = create<PaymentStore>()(
             selectedPayment: selectedPayment?.patient_id === patientId ? null : selectedPayment
           })
 
-          // Recalculate all analytics immediately
-          get()
+          recalculateAnalytics()
+
+          console.log(`ًں’° Removed ${payments.length - updatedPayments.length} payments for deleted patient ${patientId}`)
+        })
 
         // Listen for treatment deletion events to update payments
         window.addEventListener('treatment-payments-deleted', (event: any) => {
@@ -97,17 +110,11 @@ export const usePaymentStore = create<PaymentStore>()(
             payments: updatedPayments,
             selectedPayment: selectedPayment?.tooth_treatment_id === treatmentId ? null : selectedPayment
           })
-        }).calculateTotalRevenue()
-          get().calculatePendingAmount()
-          get().calculateTotalRemainingBalance()
-          get().calculatePartialPaymentsCount()
-          get().calculatePendingPaymentsCount()
-          get().calculateMonthlyRevenue()
-          get().calculatePaymentMethodStats()
-          get().filterPayments()
 
-          console.log(`💰 Removed ${payments.length - updatedPayments.length} payments for deleted patient ${patientId}`)
+          recalculateAnalytics()
+          console.log(`Removed ${payments.length - updatedPayments.length} payments for deleted treatment ${treatmentId}`)
         })
+
       }
 
       return {
@@ -358,10 +365,9 @@ export const usePaymentStore = create<PaymentStore>()(
         const { payments } = get()
         // حساب إجمالي الإيرادات من جميع المدفوعات المكتملة والجزئية
         const total = payments
-          .filter(p => p.status === 'completed' || p.status === 'partial')
           .reduce((sum, payment) => {
             // استخدام total_amount (المبلغ بعد الخصم والضريبة) بدلاً من amount (المبلغ الأصلي)
-            const amount = Number(payment.total_amount || payment.amount)
+            const amount = getRevenueTransactionAmount(payment)
 
             if (isNaN(amount) || !isFinite(amount)) {
               console.warn('Invalid payment amount:', payment.total_amount || payment.amount, 'for payment:', payment.id)
@@ -393,8 +399,9 @@ export const usePaymentStore = create<PaymentStore>()(
 
             if (payment.tooth_treatment_id) {
               // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
+              const treatmentRemaining = validateAmount(payment.treatment_remaining_balance || payment.remaining_balance)
               const treatmentCost = validateAmount(payment.treatment_total_cost) || totalAmountDue
-              pendingAmount = treatmentCost
+              pendingAmount = treatmentRemaining > 0 ? treatmentRemaining : treatmentCost
             } else if (totalAmountDue > 0) {
               pendingAmount = totalAmountDue
             } else {
@@ -436,8 +443,8 @@ export const usePaymentStore = create<PaymentStore>()(
           // استخدام التكلفة الإجمالية للعلاج كمرجع (جميع الدفعات لنفس العلاج لها نفس التكلفة)
           group.totalDue = validateAmount(payment.treatment_total_cost || group.totalDue)
           // جمع المبالغ المدفوعة من جميع الدفعات (المكتملة والجزئية)
-          if (payment.status === 'completed' || payment.status === 'partial') {
-            group.totalPaid += validateAmount(payment.amount)
+          if (isRevenuePaymentStatus(payment.status)) {
+            group.totalPaid += getTransactionAmount(payment)
           }
         })
 
@@ -456,8 +463,8 @@ export const usePaymentStore = create<PaymentStore>()(
           }
           const group = appointmentGroups[appointmentId]
           group.totalDue = validateAmount(payment.total_amount_due || group.totalDue)
-          if (payment.status === 'completed' || payment.status === 'partial') {
-            group.totalPaid += validateAmount(payment.amount)
+          if (isRevenuePaymentStatus(payment.status)) {
+            group.totalPaid += getTransactionAmount(payment)
           }
         })
 
@@ -495,7 +502,7 @@ export const usePaymentStore = create<PaymentStore>()(
         const monthlyData: { [key: string]: number } = {}
 
         payments
-          .filter(p => p.status === 'completed' || p.status === 'partial')
+          .filter(p => isRevenuePaymentStatus(p.status))
           .forEach(payment => {
             try {
               const paymentDate = new Date(payment.payment_date)
@@ -508,7 +515,7 @@ export const usePaymentStore = create<PaymentStore>()(
               const month = paymentDate.toISOString().slice(0, 7) // YYYY-MM
               // للمدفوعات المكتملة والجزئية: استخدم total_amount (المبلغ بعد الخصم والضريبة)
               // هذا يتطابق مع منطق التصدير ويعكس القيم الحقيقية المدفوعة
-              const amount = Number(payment.total_amount || payment.amount)
+              const amount = getTransactionAmount(payment)
 
               if (isNaN(amount) || !isFinite(amount)) {
                 console.warn('Invalid payment amount for monthly revenue:', payment.total_amount || payment.amount, 'for payment:', payment.id)
@@ -537,13 +544,11 @@ export const usePaymentStore = create<PaymentStore>()(
         const methodStats: { [key: string]: number } = {}
 
         payments
-          .filter(p => p.status === 'completed' || p.status === 'partial')
+          .filter(p => isRevenuePaymentStatus(p.status))
           .forEach(payment => {
             const method = payment.payment_method || 'unknown'
-            // For partial payments, use amount_paid instead of amount, otherwise use total_amount
-            const amount = payment.status === 'partial' && payment.amount_paid !== undefined
-              ? Number(payment.amount_paid)
-              : Number(payment.total_amount || payment.amount)
+            // Count the current transaction amount only; cumulative fields are balances, not revenue.
+            const amount = getTransactionAmount(payment)
 
             if (isNaN(amount) || !isFinite(amount)) {
               console.warn('Invalid payment amount for method stats:', payment.total_amount || payment.amount, 'for payment:', payment.id)

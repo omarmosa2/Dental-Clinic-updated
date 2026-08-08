@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -22,6 +22,7 @@ import { CreditCard, DollarSign, Sparkles, User, Calendar, FileText, CheckCircle
 import { useCurrency } from '@/contexts/CurrencyContext'
 import type { Payment } from '@/types'
 import { Combobox } from '@/components/ui/combobox'
+import { getTransactionAmount, isRevenuePaymentStatus } from '@/utils/paymentCalculations'
 
 interface AddPaymentDialogProps {
   open: boolean
@@ -57,7 +58,10 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
   const [unpaidTreatments, setUnpaidTreatments] = useState<any[]>([])
   const [totalUnpaidBalance, setTotalUnpaidBalance] = useState(0)
   const [isComprehensive, setIsComprehensive] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [patientRemainingBalances, setPatientRemainingBalances] = useState<Map<string, number>>(new Map())
+  const unpaidTreatmentsRequestRef = useRef(0)
+  const submitInProgressRef = useRef(false)
 
   const generateReceiptNumber = () => {
     const now = new Date()
@@ -71,7 +75,9 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
   const calculatePreviousPaymentsForTreatment = (toothTreatmentId: string) => {
     if (!toothTreatmentId || toothTreatmentId === 'none') return 0
     const treatmentPayments = getPaymentsByToothTreatment(toothTreatmentId)
-    return treatmentPayments.reduce((total, payment) => total + payment.amount, 0)
+    return treatmentPayments
+      .filter(payment => isRevenuePaymentStatus(payment.status))
+      .reduce((total, payment) => total + getTransactionAmount(payment), 0)
   }
 
   const getTotalAmountDue = () => parseFloat(formData.total_amount_due) || 0
@@ -106,21 +112,37 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
   // Load unpaid treatments when patient changes
   useEffect(() => {
     if (formData.patient_id && formData.patient_id !== '') {
+      setFormData(prev => ({
+        ...prev,
+        tooth_treatment_id: 'none',
+        amount: '',
+        total_amount_due: ''
+      }))
+      setPreviousPayments(0)
+      setIsComprehensive(false)
+      setUnpaidTreatments([])
+      setTotalUnpaidBalance(0)
       loadToothTreatmentsByPatient(formData.patient_id)
       loadUnpaidTreatments(formData.patient_id)
     } else {
+      unpaidTreatmentsRequestRef.current += 1
+      setPreviousPayments(0)
+      setIsComprehensive(false)
       setUnpaidTreatments([])
       setTotalUnpaidBalance(0)
     }
   }, [formData.patient_id, loadToothTreatmentsByPatient])
 
   const loadUnpaidTreatments = async (patientId: string) => {
+    const requestId = ++unpaidTreatmentsRequestRef.current
     try {
       const treatments = await getUnpaidTreatmentsForPatient(patientId)
+      if (requestId !== unpaidTreatmentsRequestRef.current) return
       setUnpaidTreatments(treatments)
       const total = treatments.reduce((sum: number, t: any) => sum + (t.remaining_balance || 0), 0)
       setTotalUnpaidBalance(total)
     } catch (error) {
+      if (requestId !== unpaidTreatmentsRequestRef.current) return
       console.error('Failed to load unpaid treatments:', error)
       setUnpaidTreatments([])
       setTotalUnpaidBalance(0)
@@ -267,8 +289,11 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
+    if (submitInProgressRef.current || isSubmitting) return
     if (!validateForm()) return
 
+    submitInProgressRef.current = true
+    setIsSubmitting(true)
     try {
       const amount = getCurrentAmount()
       const discountAmount = getDiscountAmount()
@@ -277,9 +302,39 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
 
       // Handle comprehensive payment
       if (isComprehensive) {
+        const freshTreatments = await getUnpaidTreatmentsForPatient(formData.patient_id)
+        const freshUnpaidBalance = freshTreatments.reduce((sum: number, treatment: any) => {
+          return sum + (Number(treatment.remaining_balance) || 0)
+        }, 0)
+        const validComprehensiveAmount = Math.min(amount, freshUnpaidBalance)
+
+        setUnpaidTreatments(freshTreatments)
+        setTotalUnpaidBalance(freshUnpaidBalance)
+        setFormData(prev => ({
+          ...prev,
+          amount: validComprehensiveAmount.toString(),
+          total_amount_due: freshUnpaidBalance.toString()
+        }))
+
+        if (freshUnpaidBalance <= 0) {
+          setErrors(prev => ({
+            ...prev,
+            amount: 'لا توجد علاجات غير مدفوعة لهذا المريض'
+          }))
+          return
+        }
+
+        if (validComprehensiveAmount <= 0) {
+          setErrors(prev => ({
+            ...prev,
+            amount: 'يجب أن يكون مبلغ الدفعة أكبر من صفر'
+          }))
+          return
+        }
+
         const result = await createComprehensivePayment(
           formData.patient_id,
-          amount,
+          validComprehensiveAmount,
           {
             payment_method: formData.payment_method,
             payment_date: formData.payment_date,
@@ -368,6 +423,10 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         variant: 'destructive',
       })
     }
+    finally {
+      submitInProgressRef.current = false
+      setIsSubmitting(false)
+    }
   }
 
   const filteredToothTreatments = toothTreatments.filter(treatment => {
@@ -376,8 +435,8 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     const treatmentCost = treatment.cost || 0
     if (treatmentPayments.length === 0) return true
     const totalPaid = treatmentPayments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
-      .reduce((sum, p) => sum + p.amount, 0)
+      .filter(p => isRevenuePaymentStatus(p.status))
+      .reduce((sum, p) => sum + getTransactionAmount(p), 0)
     return totalPaid < treatmentCost
   })
 
@@ -743,10 +802,10 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         </div>
 
         <DialogFooter className="px-6 py-4 border-t bg-muted/30 flex-row gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading} className="flex-1">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isSubmitting} className="flex-1">
             إلغاء
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isLoading || (isComprehensive && totalUnpaidBalance > 0 && (getCurrentAmount() + getTaxAmount() - getDiscountAmount()) > totalUnpaidBalance)} className="flex-1 bg-primary hover:bg-primary/90">
+          <Button type="submit" onClick={handleSubmit} disabled={isLoading || isSubmitting || (isComprehensive && totalUnpaidBalance > 0 && (getCurrentAmount() + getTaxAmount() - getDiscountAmount()) > totalUnpaidBalance)} className="flex-1 bg-primary hover:bg-primary/90">
             {isLoading ? 'جاري الحفظ...' : isComprehensive ? 'حفظ الدفعة الشاملة' : 'حفظ الدفعة'}
           </Button>
         </DialogFooter>

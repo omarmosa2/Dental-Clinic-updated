@@ -56,7 +56,7 @@ export interface Payment {
   payment_date: string
   description?: string
   receipt_number?: string
-  status: 'completed' | 'partial' | 'pending'
+  status: 'completed' | 'partial' | 'pending' | 'paid' | 'failed' | 'refunded' | 'cancelled' | 'overdue'
   notes?: string
   discount_amount?: number
   tax_amount?: number
@@ -66,6 +66,9 @@ export interface Payment {
   treatment_total_cost?: number // التكلفة الإجمالية للعلاج
   treatment_total_paid?: number // إجمالي المدفوع لهذا العلاج حتى الآن
   treatment_remaining_balance?: number // المتبقي لهذا العلاج
+  appointment_total_cost?: number
+  appointment_total_paid?: number
+  appointment_remaining_balance?: number
 
   // حقول عامة للمدفوعات غير المرتبطة بموعد
   total_amount_due?: number // المبلغ الإجمالي المطلوب (للمدفوعات العامة)

@@ -15,6 +15,7 @@ import type {
   ReportData
 } from '../types'
 import { getTreatmentNameInArabic as getArabicTreatmentName, getCategoryNameInArabic as getArabicCategoryName, getStatusLabelInArabic as getArabicStatusLabel, getPaymentStatusInArabic as getArabicPaymentStatus } from '@/utils/arabicTranslations'
+import { getRevenueTransactionAmount, getTransactionAmount } from '@/utils/paymentCalculations'
 
 export class ReportsService {
 
@@ -499,18 +500,18 @@ export class ReportsService {
       .reduce((sum, e) => sum + validateAmount(e.amount), 0)
 
     const totalRevenue = filteredPayments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
+      .filter(p => getRevenueTransactionAmount(p) > 0)
       .reduce((sum, p) => {
         // استخدام المبلغ الفعلي المدفوع في كل دفعة
-        const amount = validateAmount(p.amount)
+        const amount = getTransactionAmount(p)
         return sum + amount
       }, 0)
 
     const totalPaid = filteredPayments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
+      .filter(p => getRevenueTransactionAmount(p) > 0)
       .reduce((sum, p) => {
         // استخدام المبلغ الفعلي المدفوع في كل دفعة
-        const amount = validateAmount(p.amount)
+        const amount = getTransactionAmount(p)
         return sum + amount
       }, 0)
 
@@ -525,8 +526,9 @@ export class ReportsService {
 
         if (p.tooth_treatment_id) {
           // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
+          const treatmentRemaining = validateAmount(p.treatment_remaining_balance || p.remaining_balance)
           const treatmentCost = validateAmount(p.treatment_total_cost) || totalAmountDue
-          pendingAmount = treatmentCost
+          pendingAmount = treatmentRemaining > 0 ? treatmentRemaining : treatmentCost
         } else if (amount === 0 && totalAmountDue > 0) {
           // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
           pendingAmount = totalAmountDue
@@ -547,7 +549,7 @@ export class ReportsService {
           // مدفوعات مرتبطة بعلاجات
           const treatmentId = payment.tooth_treatment_id
           const totalDue = payment.treatment_total_cost || payment.total_amount_due || 0
-          const paidAmount = payment.amount || 0
+          const paidAmount = getTransactionAmount(payment)
 
           if (!treatmentGroups.has(treatmentId)) {
             treatmentGroups.set(treatmentId, { totalDue: validateAmount(totalDue), totalPaid: 0 })
@@ -559,7 +561,7 @@ export class ReportsService {
           // مدفوعات مرتبطة بمواعيد
           const appointmentId = payment.appointment_id
           const totalDue = payment.total_amount_due || payment.appointment_total_cost || 0
-          const paidAmount = payment.amount || 0
+          const paidAmount = getTransactionAmount(payment)
 
           if (!appointmentGroups.has(appointmentId)) {
             appointmentGroups.set(appointmentId, { totalDue: validateAmount(totalDue), totalPaid: 0 })

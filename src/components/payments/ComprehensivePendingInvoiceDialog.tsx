@@ -429,31 +429,34 @@ ${invoiceSettings.discount_reason ? `💸 سبب الخصم: ${invoiceSettings.d
 
           if (originalPayment.tooth_treatment_id) {
             // دفعة مرتبطة بعلاج
-            amountToPay = originalPayment.treatment_total_cost || item.amount || 0
+            amountToPay = item.amount || originalPayment.treatment_remaining_balance || originalPayment.remaining_balance || originalPayment.treatment_total_cost || 0
             updateData = {
               ...updateData,
               amount: amountToPay,
-              treatment_total_paid: amountToPay,
+              total_amount: amountToPay,
+              treatment_total_paid: (originalPayment.treatment_total_paid || 0) + amountToPay,
               treatment_remaining_balance: 0
             }
           } else if (originalPayment.appointment_id) {
             // دفعة مرتبطة بموعد
-            amountToPay = originalPayment.appointment_total_cost || originalPayment.total_amount_due || item.amount || 0
+            amountToPay = item.amount || originalPayment.appointment_remaining_balance || originalPayment.remaining_balance || originalPayment.appointment_total_cost || originalPayment.total_amount_due || 0
             updateData = {
               ...updateData,
               amount: amountToPay,
-              appointment_total_paid: amountToPay,
+              total_amount: amountToPay,
+              appointment_total_paid: (originalPayment.appointment_total_paid || 0) + amountToPay,
               appointment_remaining_balance: 0,
-              amount_paid: amountToPay,
+              amount_paid: (originalPayment.amount_paid || 0) + amountToPay,
               remaining_balance: 0
             }
           } else {
             // دفعة شاملة
-            amountToPay = originalPayment.total_amount_due || originalPayment.remaining_balance || item.amount || 0
+            amountToPay = item.amount || originalPayment.remaining_balance || originalPayment.total_amount_due || 0
             updateData = {
               ...updateData,
               amount: amountToPay,
-              amount_paid: amountToPay,
+              total_amount: amountToPay,
+              amount_paid: (originalPayment.amount_paid || 0) + amountToPay,
               remaining_balance: 0
             }
           }

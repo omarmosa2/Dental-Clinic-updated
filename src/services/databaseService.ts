@@ -1285,10 +1285,10 @@ export class DatabaseService {
     const excludeClause = excludePaymentId ? 'AND id != ?' : ''
     const params = excludePaymentId ? [linkId, excludePaymentId] : [linkId]
     const result = this.db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
+      SELECT COALESCE(SUM(COALESCE(total_amount, amount, 0)), 0) as total
       FROM payments
       WHERE ${linkColumn} = ?
-        AND COALESCE(status, 'completed') IN ('completed', 'partial', 'pending')
+        AND COALESCE(status, 'completed') IN ('completed', 'partial', 'paid')
         ${excludeClause}
     `).get(...params) as { total?: number }
 
@@ -1718,7 +1718,7 @@ export class DatabaseService {
     const discountAmount = paymentData.discount_amount || 0
     const taxAmount = paymentData.tax_amount || 0
     this.validatePaymentAmounts(totalAmount, discountAmount, taxAmount)
-    const amountToDistribute = totalAmount
+    let amountToDistribute = totalAmount
     const batchId = uuidv4()
 
     try {
@@ -1728,33 +1728,33 @@ export class DatabaseService {
         const unpaidTreatments = this.db.prepare(`
           SELECT tt.*,
                  COALESCE(
-                   (SELECT COALESCE(SUM(p.amount), 0)
+                    (SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0)
                     FROM payments p
                     WHERE p.tooth_treatment_id = tt.id
-                    AND p.status IN ('completed', 'partial')),
+                    AND p.status IN ('completed', 'partial', 'paid')),
                    0
                  ) as total_paid,
                  tt.cost - COALESCE(
-                   (SELECT COALESCE(SUM(p.amount), 0)
+                    (SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0)
                     FROM payments p
                     WHERE p.tooth_treatment_id = tt.id
-                    AND p.status IN ('completed', 'partial')),
+                     AND p.status IN ('completed', 'partial', 'paid')),
                    0
                  ) as remaining_balance
           FROM tooth_treatments tt
           WHERE tt.patient_id = ?
           AND tt.cost > COALESCE(
-            (SELECT COALESCE(SUM(p.amount), 0)
+            (SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0)
              FROM payments p
              WHERE p.tooth_treatment_id = tt.id
-             AND p.status IN ('completed', 'partial')),
+              AND p.status IN ('completed', 'partial', 'paid')),
             0
           )
           ORDER BY (tt.cost - COALESCE(
-            (SELECT COALESCE(SUM(p.amount), 0)
+            (SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0)
              FROM payments p
              WHERE p.tooth_treatment_id = tt.id
-             AND p.status IN ('completed', 'partial')),
+              AND p.status IN ('completed', 'partial', 'paid')),
             0
           )) ASC
         `).all(patientId) as any[]
@@ -1801,7 +1801,7 @@ export class DatabaseService {
         }
 
         if (amountToDistribute > totalRemaining) {
-          throw new Error(`Comprehensive payment amount exceeds total remaining balance (${totalRemaining})`)
+          amountToDistribute = totalRemaining
         }
 
         let remainingToDistribute = amountToDistribute
@@ -1873,7 +1873,18 @@ export class DatabaseService {
           remainingToDistribute -= amountForThisTreatment
         }
 
-        this.db.prepare("DELETE FROM payments WHERE patient_id = ? AND tooth_treatment_id IS NOT NULL AND status = 'pending' AND is_comprehensive = 0").run(patientId)
+        const clearCoveredPendingStmt = this.db.prepare(`
+          DELETE FROM payments
+          WHERE patient_id = ?
+            AND tooth_treatment_id = ?
+            AND status = 'pending'
+            AND is_comprehensive = 0
+        `)
+
+        distribution
+          .filter(item => item.newRemainingBalance <= 0)
+          .forEach(item => clearCoveredPendingStmt.run(patientId, item.treatmentId))
+
         touchedTreatmentIds.forEach(treatmentId => {
           this.updateToothTreatmentPaymentCalculationsSync(treatmentId)
         })
@@ -1919,7 +1930,7 @@ export class DatabaseService {
 
       // احصل على جميع المدفوعات المرتبطة بهذا الموعد مرتبة حسب تاريخ الدفع
       const payments = this.db.prepare(`
-        SELECT id, amount, payment_date, created_at
+        SELECT id, amount, total_amount, status, payment_date, created_at
         FROM payments
         WHERE appointment_id = ?
         ORDER BY payment_date ASC, created_at ASC
@@ -1941,11 +1952,17 @@ export class DatabaseService {
         `)
 
         payments.forEach(payment => {
-          runningTotal += payment.amount
+          const countsAsPaid = ['completed', 'partial', 'paid'].includes((payment as any).status)
+          const transactionAmount = Number((payment as any).total_amount ?? payment.amount ?? 0)
+          if (countsAsPaid && transactionAmount > 0) {
+            runningTotal += transactionAmount
+          }
           const remainingBalance = Math.max(0, appointmentCost - runningTotal)
 
-          let status: 'completed' | 'partial' | 'pending'
-          if (remainingBalance <= 0) {
+          let status: Payment['status'] = (payment as any).status || 'pending'
+          if (!countsAsPaid) {
+            status = (payment as any).status || 'pending'
+          } else if (remainingBalance <= 0) {
             status = 'completed'
           } else if (runningTotal > 0) {
             status = 'partial'
@@ -2003,11 +2020,17 @@ export class DatabaseService {
     `)
 
     payments.forEach(payment => {
-      runningTotal += payment.amount
+      const countsAsPaid = ['completed', 'partial', 'paid'].includes(payment.status as any)
+      const transactionAmount = Number(payment.total_amount ?? payment.amount ?? 0)
+      if (countsAsPaid && transactionAmount > 0) {
+        runningTotal += transactionAmount
+      }
       const remainingBalance = Math.max(0, appointmentCost - runningTotal)
 
-      let status: 'completed' | 'partial' | 'pending'
-      if (remainingBalance <= 0) {
+      let status: Payment['status'] = payment.status
+      if (!countsAsPaid) {
+        status = payment.status || 'pending'
+      } else if (remainingBalance <= 0) {
         status = 'completed'
       } else if (runningTotal > 0) {
         status = 'partial'
@@ -2065,11 +2088,17 @@ export class DatabaseService {
     `)
 
     payments.forEach(payment => {
-      runningTotal += payment.amount || 0
+      const countsAsPaid = ['completed', 'partial', 'paid'].includes(payment.status as any)
+      const transactionAmount = Number(payment.total_amount ?? payment.amount ?? 0)
+      if (countsAsPaid && transactionAmount > 0) {
+        runningTotal += transactionAmount
+      }
       const remainingBalance = Math.max(0, effectiveTreatmentCost - runningTotal)
 
-      let status: 'completed' | 'partial' | 'pending'
-      if (remainingBalance <= 0 && effectiveTreatmentCost > 0) {
+      let status: Payment['status'] = payment.status
+      if (!countsAsPaid) {
+        status = payment.status || 'pending'
+      } else if (remainingBalance <= 0 && effectiveTreatmentCost > 0) {
         status = 'completed'
       } else if (runningTotal > 0) {
         status = 'partial'
@@ -2110,7 +2139,11 @@ export class DatabaseService {
       SELECT * FROM payments WHERE appointment_id = ? ORDER BY created_at ASC
     `).all(appointmentId) as Payment[]
 
-    const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0)
+    const totalPaid = payments.reduce((sum, payment) => {
+      if (!['completed', 'partial', 'paid'].includes(payment.status as any)) return sum
+      const transactionAmount = Number(payment.total_amount ?? payment.amount ?? 0)
+      return sum + (isNaN(transactionAmount) || !isFinite(transactionAmount) ? 0 : transactionAmount)
+    }, 0)
     const remainingBalance = Math.max(0, appointmentCost - totalPaid)
 
     let status: 'completed' | 'partial' | 'pending'
@@ -2137,7 +2170,7 @@ export class DatabaseService {
       WITH treatment_paid AS (
         SELECT
           tooth_treatment_id,
-          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+          SUM(CASE WHEN status IN ('completed', 'partial', 'paid') THEN COALESCE(total_amount, amount, 0) ELSE 0 END) as total_paid
         FROM payments
         WHERE tooth_treatment_id IS NOT NULL
         GROUP BY tooth_treatment_id
@@ -2145,7 +2178,7 @@ export class DatabaseService {
       appointment_paid AS (
         SELECT
           appointment_id,
-          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+          SUM(CASE WHEN status IN ('completed', 'partial', 'paid') THEN COALESCE(total_amount, amount, 0) ELSE 0 END) as total_paid
         FROM payments
         WHERE appointment_id IS NOT NULL
         GROUP BY appointment_id
@@ -3812,6 +3845,35 @@ export class DatabaseService {
       // ✅ FIX: Return empty array instead of throwing to prevent UI crash
       return []
     }
+  }
+
+  async getUnpaidToothTreatmentsByPatient(patientId: string): Promise<any[]> {
+    this.ensureToothTreatmentsTableExists()
+
+    const stmt = this.db.prepare(`
+      WITH treatment_paid AS (
+        SELECT
+          tooth_treatment_id,
+          COALESCE(SUM(COALESCE(total_amount, amount, 0)), 0) as total_paid
+        FROM payments
+        WHERE status IN ('completed', 'partial', 'paid')
+          AND tooth_treatment_id IS NOT NULL
+        GROUP BY tooth_treatment_id
+      )
+      SELECT tt.*,
+             a.title as appointment_title,
+             a.start_time as appointment_start_time,
+             COALESCE(tp.total_paid, 0) as total_paid,
+             MAX(COALESCE(tt.cost, 0) - COALESCE(tp.total_paid, 0), 0) as remaining_balance
+      FROM tooth_treatments tt
+      LEFT JOIN appointments a ON tt.appointment_id = a.id
+      LEFT JOIN treatment_paid tp ON tp.tooth_treatment_id = tt.id
+      WHERE tt.patient_id = ?
+        AND COALESCE(tt.cost, 0) > COALESCE(tp.total_paid, 0)
+      ORDER BY remaining_balance ASC, tt.tooth_number ASC, tt.priority ASC
+    `)
+
+    return stmt.all(patientId)
   }
 
   async getToothTreatmentsByTooth(patientId: string, toothNumber: number): Promise<any[]> {
