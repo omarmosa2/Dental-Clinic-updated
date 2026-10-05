@@ -23,6 +23,7 @@ import { useCurrency } from '@/contexts/CurrencyContext'
 import type { Payment } from '@/types'
 import { Combobox } from '@/components/ui/combobox'
 import { getTransactionAmount, isRevenuePaymentStatus } from '@/utils/paymentCalculations'
+import { formatTreatmentTeeth } from '@/utils/toothTreatmentUtils'
 
 interface AddPaymentDialogProps {
   open: boolean
@@ -519,7 +520,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                       </SelectItem>
                       {filteredToothTreatments.map(t => (
                         <SelectItem key={t.id} value={t.id}>
-                          <span className="text-xs">السن {t.tooth_number} - {getTreatmentNameInArabic(t.treatment_type)}</span>
+                          <span className="text-xs">الأسنان {formatTreatmentTeeth(t)} - {getTreatmentNameInArabic(t.treatment_type)}</span>
                         </SelectItem>
                       ))}
                     </SelectContent>

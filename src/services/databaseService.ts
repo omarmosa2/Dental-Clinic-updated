@@ -2331,6 +2331,10 @@ export class DatabaseService {
     // Check if tooth_treatment_id column exists
     const hasToothTreatmentId = this.checkColumnExists('payments', 'tooth_treatment_id')
 
+    if (hasToothTreatmentId) {
+      this.ensureToothTreatmentsTableExists()
+    }
+
     let query: string
     if (hasToothTreatmentId) {
       // Use the full query with tooth_treatments join
@@ -2346,6 +2350,8 @@ export class DatabaseService {
           a.end_time as appointment_end_time,
           tt.treatment_type as treatment_name,
           tt.tooth_number,
+          tt.tooth_numbers,
+          tt.is_multi_tooth,
           tt.tooth_name,
           tt.cost as treatment_cost
         FROM payments p
@@ -2401,6 +2407,8 @@ export class DatabaseService {
         id: payment.tooth_treatment_id,
         treatment_type: payment.treatment_name,
         tooth_number: payment.tooth_number,
+        tooth_numbers: payment.tooth_numbers,
+        is_multi_tooth: payment.is_multi_tooth,
         tooth_name: payment.tooth_name,
         cost: payment.treatment_cost
       } : null
@@ -3886,10 +3894,14 @@ export class DatabaseService {
       FROM tooth_treatments tt
       LEFT JOIN patients p ON tt.patient_id = p.id
       LEFT JOIN appointments a ON tt.appointment_id = a.id
-      WHERE tt.patient_id = ? AND tt.tooth_number = ?
+      WHERE tt.patient_id = ?
+        AND (
+          tt.tooth_number = ?
+          OR (',' || COALESCE(tt.tooth_numbers, CAST(tt.tooth_number AS TEXT)) || ',') LIKE ?
+        )
       ORDER BY tt.priority ASC, tt.created_at DESC
     `)
-    return stmt.all(patientId, toothNumber)
+    return stmt.all(patientId, toothNumber, `%,${toothNumber},%`)
   }
 
   // NEW: Get tooth treatments by appointment ID
@@ -3919,6 +3931,15 @@ export class DatabaseService {
 
     const id = uuidv4()
     const now = new Date().toISOString()
+    const toothNumbers = Array.isArray(treatment.tooth_numbers)
+      ? treatment.tooth_numbers.map(Number).filter(Number.isFinite)
+      : typeof treatment.tooth_numbers === 'string' && treatment.tooth_numbers.trim()
+        ? treatment.tooth_numbers.split(',').map((value: string) => Number(value.trim())).filter(Number.isFinite)
+        : [Number(treatment.tooth_number)]
+    const normalizedToothNumbers = Array.from(new Set(toothNumbers.length > 0 ? toothNumbers : [Number(treatment.tooth_number)]))
+      .sort((a, b) => a - b)
+    const toothNumbersValue = normalizedToothNumbers.join(',')
+    const isMultiTooth = normalizedToothNumbers.length > 1 ? 1 : 0
 
     // Auto-assign priority if not provided
     if (!treatment.priority) {
@@ -3933,21 +3954,21 @@ export class DatabaseService {
 
     const stmt = this.db.prepare(`
       INSERT INTO tooth_treatments (
-        id, patient_id, tooth_number, tooth_name, treatment_type, treatment_category,
+        id, patient_id, tooth_number, tooth_numbers, is_multi_tooth, tooth_name, treatment_type, treatment_category,
         treatment_status, treatment_color, start_date, completion_date, cost,
         priority, notes, appointment_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
 
     stmt.run(
-      id, treatment.patient_id, treatment.tooth_number, treatment.tooth_name,
+      id, treatment.patient_id, treatment.tooth_number, toothNumbersValue, isMultiTooth, treatment.tooth_name,
       treatment.treatment_type, treatment.treatment_category, treatment.treatment_status,
       treatment.treatment_color, treatment.start_date, treatment.completion_date,
       treatment.cost, treatment.priority, treatment.notes, treatment.appointment_id,
       now, now
     )
 
-    return { ...treatment, id, created_at: now, updated_at: now }
+    return { ...treatment, tooth_numbers: toothNumbersValue, is_multi_tooth: isMultiTooth, id, created_at: now, updated_at: now }
   }
 
   // NEW: Update tooth treatment
@@ -3957,7 +3978,7 @@ export class DatabaseService {
     const now = new Date().toISOString()
 
     const allowedColumns = [
-      'patient_id', 'tooth_number', 'tooth_name', 'treatment_type', 'treatment_category',
+      'patient_id', 'tooth_number', 'tooth_numbers', 'is_multi_tooth', 'tooth_name', 'treatment_type', 'treatment_category',
       'treatment_status', 'treatment_color', 'start_date', 'completion_date',
       'cost', 'priority', 'notes', 'appointment_id'
     ]
@@ -3969,7 +3990,15 @@ export class DatabaseService {
     }
 
     const setClause = updateColumns.map(col => `${col} = ?`).join(', ')
-    const values = updateColumns.map(col => updates[col])
+    const values = updateColumns.map(col => {
+      if (col === 'tooth_numbers' && Array.isArray(updates[col])) {
+        return Array.from(new Set(updates[col].map(Number).filter(Number.isFinite))).sort((a, b) => a - b).join(',')
+      }
+      if (col === 'is_multi_tooth') {
+        return updates[col] ? 1 : 0
+      }
+      return updates[col]
+    })
     values.push(now, id) // Add updated_at and id for WHERE clause
 
     const stmt = this.db.prepare(`
@@ -4046,10 +4075,10 @@ export class DatabaseService {
       // Re-insert treatments in the new order
       const insertStmt = this.db.prepare(`
         INSERT INTO tooth_treatments (
-          id, patient_id, tooth_number, tooth_name, treatment_type, treatment_category,
+          id, patient_id, tooth_number, tooth_numbers, is_multi_tooth, tooth_name, treatment_type, treatment_category,
           treatment_color, treatment_status, cost, start_date, completion_date,
           notes, priority, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `)
 
       treatmentIds.forEach((treatmentId, index) => {
@@ -4059,6 +4088,8 @@ export class DatabaseService {
             treatment.id,
             treatment.patient_id,
             treatment.tooth_number,
+            treatment.tooth_numbers || String(treatment.tooth_number),
+            treatment.is_multi_tooth || 0,
             treatment.tooth_name,
             treatment.treatment_type,
             treatment.treatment_category,
@@ -4187,6 +4218,8 @@ export class DatabaseService {
               (tooth_number >= 71 AND tooth_number <= 75) OR
               (tooth_number >= 81 AND tooth_number <= 85)
             ),
+            tooth_numbers TEXT,
+            is_multi_tooth INTEGER DEFAULT 0,
             tooth_name TEXT NOT NULL,
             treatment_type TEXT NOT NULL,
             treatment_category TEXT NOT NULL,
@@ -4315,6 +4348,25 @@ export class DatabaseService {
       } else {
         console.log('✅ [TOOTH_TREATMENTS] Table already exists - skipping creation')
       }
+
+      const toothTreatmentsColumns = this.db.prepare(`PRAGMA table_info(tooth_treatments)`).all() as any[]
+      const toothTreatmentsColumnNames = toothTreatmentsColumns.map((column: any) => column.name)
+
+      if (!toothTreatmentsColumnNames.includes('tooth_numbers')) {
+        console.log('🔄 [TOOTH_TREATMENTS] Adding tooth_numbers column for multi-tooth treatments')
+        this.db.exec(`ALTER TABLE tooth_treatments ADD COLUMN tooth_numbers TEXT`)
+      }
+
+      if (!toothTreatmentsColumnNames.includes('is_multi_tooth')) {
+        console.log('🔄 [TOOTH_TREATMENTS] Adding is_multi_tooth column for multi-tooth treatments')
+        this.db.exec(`ALTER TABLE tooth_treatments ADD COLUMN is_multi_tooth INTEGER DEFAULT 0`)
+      }
+
+      this.db.exec(`
+        UPDATE tooth_treatments
+        SET tooth_numbers = CAST(tooth_number AS TEXT)
+        WHERE tooth_numbers IS NULL OR TRIM(tooth_numbers) = '';
+      `)
 
       // ✅ FIX: Verify table is accessible by running a test query
       const testCount = this.db.prepare('SELECT COUNT(*) as count FROM tooth_treatments').get() as { count: number }

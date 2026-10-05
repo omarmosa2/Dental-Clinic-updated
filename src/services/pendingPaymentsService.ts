@@ -11,6 +11,7 @@ import {
   ClinicSettings
 } from '@/types'
 import { getTreatmentNameInArabic } from '@/data/teethData'
+import { formatTreatmentTeeth, getTreatmentToothNumbers } from '@/utils/toothTreatmentUtils'
 
 /**
  * خدمة حسابات المدفوعات المعلقة
@@ -246,7 +247,10 @@ export class PendingPaymentsService {
           appointment_title: appointment?.title,
           treatment_type: treatmentTypeArabic, // استخدام الترجمة العربية
           tooth_number: relatedTreatment?.tooth_number,
-          tooth_name: relatedTreatment?.tooth_name,
+          tooth_numbers: relatedTreatment?.tooth_numbers,
+          tooth_name: relatedTreatment && getTreatmentToothNumbers(relatedTreatment).length > 1
+            ? `الأسنان ${formatTreatmentTeeth(relatedTreatment)}`
+            : relatedTreatment?.tooth_name,
           amount: this.roundToTwoDecimals(pendingAmount),
           description: cleanDescription, // استخدام الوصف المنظف
           payment_date: payment.payment_date,

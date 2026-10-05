@@ -10,6 +10,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { getToothInfo, PERMANENT_TEETH_DATA, PRIMARY_TEETH_DATA, TREATMENT_CATEGORIES, getTreatmentByValue, TREATMENT_STATUS_OPTIONS } from '@/data/teethData'
 import { ToothTreatment } from '@/types'
 import { cn } from '@/lib/utils'
+import { treatmentIncludesTooth } from '@/utils/toothTreatmentUtils'
 import { Layers, Activity, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 
 interface EnhancedDentalChartProps {
@@ -128,7 +129,7 @@ export default function EnhancedDentalChart({
   // Get treatments for a specific tooth
   const getToothTreatments = (toothNumber: number): ToothTreatment[] => {
     const treatments = toothTreatments.filter(
-      t => t.patient_id === patientId && t.tooth_number === toothNumber
+      t => t.patient_id === patientId && treatmentIncludesTooth(t, toothNumber)
     ).sort((a, b) => a.priority - b.priority)
 
     // تم إزالة console.log لتقليل الرسائل عند تمرير الماوس

@@ -88,6 +88,8 @@ export interface Payment {
     id: string
     treatment_type: string
     tooth_number: number
+    tooth_numbers?: number[] | string
+    is_multi_tooth?: boolean | number
     tooth_name?: string
     cost?: number
   }
@@ -324,6 +326,8 @@ export interface ToothTreatment {
   id: string
   patient_id: string
   tooth_number: number
+  tooth_numbers?: number[] | string
+  is_multi_tooth?: boolean | number
   tooth_name: string
   treatment_type: string
   treatment_category: string
@@ -494,6 +498,7 @@ export interface PendingPaymentItem {
   appointment_title?: string
   treatment_type?: string
   tooth_number?: number
+  tooth_numbers?: number[] | string
   tooth_name?: string
   amount: number
   description?: string

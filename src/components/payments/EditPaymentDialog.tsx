@@ -12,6 +12,7 @@ import { useAppointmentStore } from '@/store/appointmentStore'
 import { useDentalTreatmentStore } from '@/store/dentalTreatmentStore'
 import { useToast } from '@/hooks/use-toast'
 import { getTreatmentNameInArabic } from '@/utils/arabicTranslations'
+import { formatTreatmentTeeth } from '@/utils/toothTreatmentUtils'
 import {
   Select,
   SelectContent,
@@ -429,7 +430,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                                 return (
                                   <>
                                     <span className="font-medium text-foreground">
-                                      السن {linkedTreatment.tooth_number} - {getTreatmentNameInArabic(linkedTreatment.treatment_type)}
+                                      الأسنان {formatTreatmentTeeth(linkedTreatment)} - {getTreatmentNameInArabic(linkedTreatment.treatment_type)}
                                     </span>
                                     <span className="text-xs text-muted-foreground">
                                       التكلفة: {formatAmount(linkedTreatment.cost || 0)}
@@ -475,7 +476,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                           return (
                             <SelectItem key={treatment.id} value={treatment.id}>
                               <div className="flex flex-col">
-                                <span>{`السن ${treatment.tooth_number} - ${getTreatmentNameInArabic(treatment.treatment_type)}`}</span>
+                                <span>{`الأسنان ${formatTreatmentTeeth(treatment)} - ${getTreatmentNameInArabic(treatment.treatment_type)}`}</span>
                                 <div className="text-xs text-muted-foreground">
                                   <span>التكلفة: {formatAmount(treatmentCost)}</span>
                                   {remainingAmount > 0 && remainingAmount < treatmentCost && (

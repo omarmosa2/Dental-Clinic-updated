@@ -26,6 +26,7 @@ import DentalImage from './DentalImage'
 import './dental-images.css'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/contexts/ThemeContext'
+import { treatmentIncludesTooth } from '@/utils/toothTreatmentUtils'
 import {
   Layers,
   Camera,
@@ -97,7 +98,7 @@ export default function EnhancedToothDetailsDialog({
 
   // Filter treatments for this specific tooth
   const currentToothTreatments = (toothTreatments || []).filter(
-    t => t.patient_id === patientId && t.tooth_number === toothNumber
+    t => toothNumber !== null && t.patient_id === patientId && treatmentIncludesTooth(t, toothNumber)
   )
 
   // Get the primary treatment color (highest priority active treatment)
@@ -282,7 +283,7 @@ export default function EnhancedToothDetailsDialog({
 
       // Optimistic update: Update local state immediately for better UX
       const currentTreatments = toothTreatments.filter(
-        t => t.patient_id === patientId && t.tooth_number === toothNumber
+        t => t.patient_id === patientId && treatmentIncludesTooth(t, toothNumber)
       )
 
       console.log('Reordering treatments:', {
@@ -820,7 +821,7 @@ export default function EnhancedToothDetailsDialog({
                     <SelectContent>
                       <SelectItem value="none">بدون ربط بعلاج محدد</SelectItem>
                       {(toothTreatments || [])
-                        .filter(treatment => treatment.patient_id === patientId && treatment.tooth_number === toothNumber)
+                        .filter(treatment => toothNumber !== null && treatment.patient_id === patientId && treatmentIncludesTooth(treatment, toothNumber))
                         .map((treatment) => (
                           <SelectItem key={treatment.id} value={treatment.id}>
                             {getTreatmentByValue(treatment.treatment_type)?.label || treatment.treatment_type} - {treatment.treatment_status === 'completed' ? 'مكتمل' :

@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { getTreatmentNameInArabic } from '@/utils/arabicTranslations'
+import { formatTreatmentTeeth } from '@/utils/toothTreatmentUtils'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
@@ -33,6 +34,10 @@ import {
 import { formatDate, formatCurrency } from '@/lib/utils'
 
 type SortField = 'payment_date' | 'amount' | 'patient_name' | 'payment_method' | 'status' | 'receipt_number'
+
+const getPaymentTreatmentTeethLabel = (payment: Payment): string => {
+  return payment.tooth_treatment ? formatTreatmentTeeth(payment.tooth_treatment) : ''
+}
 type SortDirection = 'asc' | 'desc'
 
 interface PaymentTableProps {
@@ -400,7 +405,7 @@ export default function PaymentTable({
                       <TableCell className="text-center">
                         <div className="space-y-1">
                           <div className="text-sm font-medium arabic-enhanced text-blue-600 dark:text-blue-400">
-                            السن {payment.tooth_treatment?.tooth_number}
+                            الأسنان {getPaymentTreatmentTeethLabel(payment)}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {getTreatmentNameInArabic(payment.tooth_treatment?.treatment_type || '')}
@@ -469,7 +474,7 @@ export default function PaymentTable({
                       {payment.tooth_treatment_id ? (
                         <div className="space-y-1">
                           <div className="text-sm font-medium arabic-enhanced text-blue-600 dark:text-blue-400">
-                            السن {payment.tooth_treatment?.tooth_number}
+                            الأسنان {getPaymentTreatmentTeethLabel(payment)}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {getTreatmentNameInArabic(payment.tooth_treatment?.treatment_type || '')}

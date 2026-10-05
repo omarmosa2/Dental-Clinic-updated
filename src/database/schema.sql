@@ -400,6 +400,8 @@ CREATE TABLE IF NOT EXISTS tooth_treatments (
         (tooth_number >= 71 AND tooth_number <= 75) OR
         (tooth_number >= 81 AND tooth_number <= 85)
     ),
+    tooth_numbers TEXT,
+    is_multi_tooth INTEGER DEFAULT 0,
     tooth_name TEXT NOT NULL,
     treatment_type TEXT NOT NULL, -- From TREATMENT_TYPES
     treatment_category TEXT NOT NULL, -- preventive, restorative, endodontic, etc.

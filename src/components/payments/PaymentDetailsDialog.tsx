@@ -27,6 +27,7 @@ import {
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { getTreatmentNameInArabic } from '@/utils/arabicTranslations'
 import { useCurrency } from '@/contexts/CurrencyContext'
+import { formatTreatmentTeeth } from '@/utils/toothTreatmentUtils'
 
 interface PaymentDetailsDialogProps {
   open: boolean
@@ -273,8 +274,8 @@ export default function PaymentDetailsDialog({
                   </span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">رقم السن:</span>
-                  <span className="text-sm text-foreground">{payment.tooth_treatment.tooth_number}</span>
+                  <span className="text-sm text-muted-foreground">الأسنان:</span>
+                  <span className="text-sm text-foreground">{formatTreatmentTeeth(payment.tooth_treatment)}</span>
                 </div>
                 {payment.tooth_treatment.tooth_name && (
                   <div className="flex items-center justify-between">

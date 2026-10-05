@@ -66,6 +66,11 @@ import {
   Eye
 } from 'lucide-react'
 
+const getPendingItemToothDisplay = (item: PendingPaymentItem): string => {
+  if (!item.tooth_name) return ''
+  return item.tooth_numbers ? item.tooth_name : `${item.tooth_name} (${item.tooth_number})`
+}
+
 interface ComprehensivePendingInvoiceDialogProps {
   patient: Patient | null
   open: boolean
@@ -781,7 +786,7 @@ ${invoiceSettings.discount_reason ? `💸 سبب الخصم: ${invoiceSettings.d
                       ${item.payment_date ? `📅 تاريخ الدفعة: ${formatDate(item.payment_date)}` : ''}
                       ${item.appointment_date ? `<br>📅 تاريخ الموعد: ${formatDate(item.appointment_date)}` : ''}
                       ${item.treatment_type ? `<br>🔧 نوع العلاج: ${item.treatment_type}` : ''}
-                      ${item.tooth_name ? `<br>🦷 ${item.tooth_name} (${item.tooth_number})` : ''}
+                      ${item.tooth_name ? `<br>🦷 ${getPendingItemToothDisplay(item)}` : ''}
                       ${item.doctor_name ? `<br>👨‍⚕️ الطبيب: ${item.doctor_name}` : ''}
                       ${item.notes ? `<br>📝 ملاحظات: ${item.notes}` : ''}
                       ${item.payment_method ? `<br>💳 طريقة الدفع: ${item.payment_method}` : ''}
@@ -935,7 +940,7 @@ ${invoiceSettings.discount_reason ? `💸 سبب الخصم: ${invoiceSettings.d
         message += `   🔧 ${item.treatment_type}\n`
       }
       if (item.tooth_name) {
-        message += `   🦷 ${item.tooth_name} (${item.tooth_number})\n`
+        message += `   🦷 ${getPendingItemToothDisplay(item)}\n`
       }
       message += `   💵 ${formatCurrency(item.amount)}\n`
     })
@@ -1472,7 +1477,7 @@ ${invoiceSettings.discount_reason ? `💸 سبب الخصم: ${invoiceSettings.d
                                     <p>📅 تاريخ الموعد: {formatDate(item.appointment_date)}</p>
                                   )}
                                   {item.tooth_name && (
-                                    <p>🦷 {item.tooth_name} (سن #{item.tooth_number})</p>
+                                    <p>🦷 {getPendingItemToothDisplay(item)}</p>
                                   )}
                                   {item.treatment_type && itemType === 'علاج' && (
                                     <p>🔧 نوع العلاج: {item.treatment_type}</p>
