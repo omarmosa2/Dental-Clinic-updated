@@ -1,3 +1,5 @@
+import { finalAmount, validatePaymentAmounts, balance, previewPayment } from '@/services/paymentCore.mjs'
+import { useFinancialRequest } from '@/hooks/useFinancialRequest'
 import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -33,8 +35,9 @@ interface AddPaymentDialogProps {
 
 export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatientId }: AddPaymentDialogProps) {
 
+  const requestKey = useFinancialRequest()
   const { toast } = useToast()
-  const { createPayment, updatePayment, isLoading, getPaymentsByToothTreatment, createComprehensivePayment, getUnpaidTreatmentsForPatient } = usePaymentStore()
+  const { createPayment, isLoading, getPaymentsByToothTreatment, createComprehensivePayment, getUnpaidTreatmentsForPatient } = usePaymentStore()
   const { patients } = usePatientStore()
   const { toothTreatments, loadToothTreatmentsByPatient } = useDentalTreatmentStore()
   const { formatAmount } = useCurrency()
@@ -85,32 +88,16 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
   const getCurrentAmount = () => parseFloat(formData.amount) || 0
   const getDiscountAmount = () => parseFloat(formData.discount_amount) || 0
   const getTaxAmount = () => parseFloat(formData.tax_amount) || 0
-  const getTotalPaid = () => previousPayments + getCurrentAmount()
-  const getRemainingBalance = () => Math.max(0, getTotalAmountDue() - getTotalPaid())
-  const getFinalAmount = () => getCurrentAmount() + getTaxAmount() - getDiscountAmount()
+  const getPreview = () => previewPayment({
+    cost: isComprehensive ? totalUnpaidBalance : getTotalAmountDue(),
+    previousPaid: isComprehensive ? 0 : previousPayments,
+    amount: formData.amount, discount: formData.discount_amount, tax: formData.tax_amount
+  })
+  const getTotalPaid = () => getPreview().totalPaid
+  const getRemainingBalance = () => getPreview().remainingBalance
+  const getFinalAmount = () => getPreview().totalAmount
+  const getSuggestedStatus = () => getPreview().status
 
-  const getSuggestedStatus = (): 'completed' | 'partial' | 'pending' => {
-    const amount = getCurrentAmount()
-    const totalDue = getTotalAmountDue()
-
-    if (isComprehensive) {
-      if (amount >= totalUnpaidBalance) return 'completed'
-      if (amount > 0) return 'partial'
-      return 'pending'
-    }
-
-    if (totalDue > 0 && formData.tooth_treatment_id !== 'none') {
-      const newTotalPaid = previousPayments + amount
-      if (newTotalPaid >= totalDue) return 'completed'
-      if (newTotalPaid > 0) return 'partial'
-      return 'pending'
-    }
-
-    if (amount > 0) return 'completed'
-    return 'pending'
-  }
-
-  // Load unpaid treatments when patient changes
   useEffect(() => {
     if (formData.patient_id && formData.patient_id !== '') {
       setFormData(prev => ({
@@ -260,8 +247,8 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     }
 
     if (!isComprehensive && formData.tooth_treatment_id !== 'none' && totalDue > 0) {
-      const remainingBefore = totalDue - previousPayments
-      if (amount > remainingBefore) {
+      const remainingBefore = balance(totalDue, previousPayments)
+      if (getFinalAmount() > remainingBefore) {
         newErrors.amount = `المبلغ لا يمكن أن يتجاوز المتبقي (${formatAmount(remainingBefore)})`
       }
       if (amount <= 0) {
@@ -270,7 +257,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
     }
 
     if (isComprehensive && totalUnpaidBalance > 0) {
-      const finalAmount = amount + getTaxAmount() - getDiscountAmount()
+      const finalAmount = getFinalAmount()
       if (finalAmount > totalUnpaidBalance) {
         newErrors.amount = 'المبلغ المدخل يتجاوز إجمالي المبلغ المطلوب'
       }
@@ -283,6 +270,11 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       newErrors.amount = 'هذا المريض ليس لديه علاجات غير مدفوعة'
     }
 
+    try {
+      validatePaymentAmounts(Number(formData.amount), Number(formData.discount_amount), Number(formData.tax_amount))
+      if (Number(formData.amount) <= 0) newErrors.amount = 'يجب أن يكون مبلغ الدفعة أكبر من صفر'
+      if (getFinalAmount() <= 0) newErrors.amount = 'يجب أن يكون صافي مبلغ الدفعة أكبر من صفر'
+    } catch (error) { newErrors.amount = (error as Error).message }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -299,7 +291,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
       const amount = getCurrentAmount()
       const discountAmount = getDiscountAmount()
       const taxAmount = getTaxAmount()
-      const totalAmount = amount + taxAmount - discountAmount
+      const totalAmount = finalAmount(amount, discountAmount, taxAmount)
 
       // Handle comprehensive payment
       if (isComprehensive) {
@@ -307,7 +299,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         const freshUnpaidBalance = freshTreatments.reduce((sum: number, treatment: any) => {
           return sum + (Number(treatment.remaining_balance) || 0)
         }, 0)
-        const validComprehensiveAmount = Math.min(amount, freshUnpaidBalance)
+        const validComprehensiveAmount = amount
 
         setUnpaidTreatments(freshTreatments)
         setTotalUnpaidBalance(freshUnpaidBalance)
@@ -333,20 +325,19 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           return
         }
 
+        const comprehensiveData = {
+          payment_method: formData.payment_method, payment_date: formData.payment_date,
+          description: formData.description || 'دفعة شاملة', receipt_number: formData.receipt_number,
+          notes: formData.notes, discount_amount: discountAmount, tax_amount: taxAmount
+        }
         const result = await createComprehensivePayment(
           formData.patient_id,
           validComprehensiveAmount,
-          {
-            payment_method: formData.payment_method,
-            payment_date: formData.payment_date,
-            description: formData.description || 'دفعة شاملة',
-            receipt_number: formData.receipt_number || generateReceiptNumber(),
-            notes: formData.notes,
-            discount_amount: discountAmount,
-            tax_amount: taxAmount
-          }
+          { ...comprehensiveData, request_id: requestKey({ ...comprehensiveData, patient_id: formData.patient_id, amount }) }
         )
 
+        if (!result.success) throw new Error(result.message)
+        requestKey.reset()
         toast({ title: 'تم بنجاح', description: result.message || 'تم تسجيل الدفعة الشاملة بنجاح' })
         onOpenChange(false)
         return
@@ -380,40 +371,9 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
         paymentData.remaining_balance = getRemainingBalance()
       }
 
-      if (formData.tooth_treatment_id !== 'none') {
-        const existingPayments = getPaymentsByToothTreatment(formData.tooth_treatment_id)
-        if (existingPayments.length > 0) {
-          const pendingPayment = existingPayments.find(p => p.status === 'pending')
-          const targetPayment = pendingPayment || existingPayments[0]
-          const updatedAmount = targetPayment.amount + amount
-
-          let newStatus: 'completed' | 'partial' | 'pending'
-          if (updatedAmount >= totalAmountDue) newStatus = 'completed'
-          else if (updatedAmount > 0) newStatus = 'partial'
-          else newStatus = 'pending'
-
-          await updatePayment(targetPayment.id, {
-            amount: updatedAmount,
-            payment_method: formData.payment_method,
-            payment_date: formData.payment_date,
-            description: formData.description || targetPayment.description,
-            receipt_number: formData.receipt_number || targetPayment.receipt_number,
-            status: newStatus,
-            notes: formData.notes || targetPayment.notes,
-            discount_amount: discountAmount > 0 ? discountAmount : targetPayment.discount_amount,
-            tax_amount: taxAmount > 0 ? taxAmount : targetPayment.tax_amount,
-            total_amount: updatedAmount + taxAmount - discountAmount,
-            total_amount_due: totalAmountDue,
-            treatment_total_cost: totalAmountDue,
-            treatment_total_paid: updatedAmount,
-            treatment_remaining_balance: Math.max(0, totalAmountDue - updatedAmount)
-          })
-        } else {
-          await createPayment(paymentData)
-        }
-      } else {
-        await createPayment(paymentData)
-      }
+      paymentData.request_id = requestKey(paymentData)
+      await createPayment(paymentData)
+      requestKey.reset()
 
       toast({ title: 'تم بنجاح', description: 'تم تسجيل الدفعة بنجاح' })
       onOpenChange(false)
@@ -587,7 +547,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                   <Label className="text-xs text-muted-foreground">المبلغ <span className="text-destructive">*</span></Label>
                   <Input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     max={isComprehensive && totalUnpaidBalance > 0 ? totalUnpaidBalance : undefined}
                     placeholder="0.00"
@@ -606,7 +566,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                   <Label className="text-xs text-muted-foreground">الخصم</Label>
                   <Input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     placeholder="0.00"
                     value={formData.discount_amount}
@@ -619,7 +579,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
                   <Label className="text-xs text-muted-foreground">الضريبة</Label>
                   <Input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     placeholder="0.00"
                     value={formData.tax_amount}
@@ -806,7 +766,7 @@ export default function AddPaymentDialog({ open, onOpenChange, preSelectedPatien
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading || isSubmitting} className="flex-1">
             إلغاء
           </Button>
-          <Button type="submit" onClick={handleSubmit} disabled={isLoading || isSubmitting || (isComprehensive && totalUnpaidBalance > 0 && (getCurrentAmount() + getTaxAmount() - getDiscountAmount()) > totalUnpaidBalance)} className="flex-1 bg-primary hover:bg-primary/90">
+          <Button type="submit" onClick={handleSubmit} disabled={isLoading || isSubmitting || (isComprehensive && totalUnpaidBalance > 0 && getFinalAmount() > totalUnpaidBalance)} className="flex-1 bg-primary hover:bg-primary/90">
             {isLoading ? 'جاري الحفظ...' : isComprehensive ? 'حفظ الدفعة الشاملة' : 'حفظ الدفعة'}
           </Button>
         </DialogFooter>

@@ -1,3 +1,4 @@
+import { getRevenueTransactionAmount, summarizePaymentBalances, sumPayments, money } from '@/services/paymentCore.mjs'
 import { Payment, Appointment, Patient, InventoryItem, ToothTreatment, Prescription, ClinicNeed, LabOrder } from '@/types'
 import { formatCurrency, formatDate, formatTime } from '@/lib/utils'
 import { validateBeforeExport } from '@/utils/exportValidation'
@@ -142,52 +143,24 @@ export class ComprehensiveExportService {
     // المدفوعات المكتملة
     const completedPayments = validateAmount(
       payments
-        .filter(p => p.status === 'completed')
-        .reduce((sum, payment) => sum + validateAmount(payment.total_amount || payment.amount), 0)
+        .filter(p => p.status === 'completed' || p.status === 'paid')
+        .reduce((sum, payment) => sum + getRevenueTransactionAmount(payment), 0)
     )
 
     // المدفوعات الجزئية
     const partialPayments = validateAmount(
       payments
         .filter(p => p.status === 'partial')
-        .reduce((sum, payment) => sum + validateAmount(payment.total_amount || payment.amount), 0)
+        .reduce((sum, payment) => sum + getRevenueTransactionAmount(payment), 0)
     )
 
     // إجمالي الإيرادات
-    const totalRevenue = completedPayments + partialPayments
+    const totalRevenue = money(completedPayments + partialPayments)
 
     // المبالغ المتبقية من المدفوعات الجزئية والمعلقة
-    const remainingBalances = validateAmount(
-      payments
-        .filter(p => (p.status === 'partial' || p.status === 'pending') &&
-                    (p.treatment_remaining_balance || p.remaining_balance))
-        .reduce((sum, payment) => {
-          const treatmentRemaining = validateAmount(payment.treatment_remaining_balance)
-          const generalRemaining = validateAmount(payment.remaining_balance)
-          return sum + (treatmentRemaining || generalRemaining)
-        }, 0)
-    )
-
-    // المدفوعات المعلقة
-    const pendingAmount = payments
-      .filter(p => p.status === 'pending')
-      .reduce((sum, payment) => {
-        const amount = validateAmount(payment.amount)
-        const totalAmountDue = validateAmount(payment.total_amount_due)
-
-        let pendingAmount = amount
-
-        if (payment.tooth_treatment_id) {
-          // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
-          const treatmentCost = validateAmount(payment.treatment_total_cost) || totalAmountDue
-          pendingAmount = treatmentCost
-        } else if (amount === 0 && totalAmountDue > 0) {
-          // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
-          pendingAmount = totalAmountDue
-        }
-
-        return sum + pendingAmount
-      }, 0)
+    const balances = summarizePaymentBalances(payments)
+    const remainingBalances = balances.remainingBalance
+    const pendingAmount = balances.pendingBalance
 
     // === المصروفات ===
     let labOrdersTotal = 0
@@ -319,7 +292,7 @@ export class ComprehensiveExportService {
 
       // إحصائيات إضافية
       totalTransactions: payments.length,
-      completedTransactions: payments.filter(p => p.status === 'completed').length,
+      completedTransactions: payments.filter(p => p.status === 'completed' || p.status === 'paid').length,
       partialTransactions: payments.filter(p => p.status === 'partial').length,
       pendingTransactions: payments.filter(p => p.status === 'pending').length
     }
@@ -962,27 +935,8 @@ export class ComprehensiveExportService {
         let totalRemaining = 0
 
         // حساب المبالغ بالطريقة الصحيحة
-        let patientTotalDue = 0
-        let patientTotalPaid = 0
-
-        // حساب المدفوعات المرتبطة بالمواعيد
-        patientAppointments.forEach(appointment => {
-          if (appointment.cost) {
-            const appointmentPayments = patientPayments.filter(p => p.appointment_id === appointment.id)
-            const appointmentTotalPaid = appointmentPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
-            patientTotalDue += appointment.cost
-            patientTotalPaid += appointmentTotalPaid
-          }
-        })
-
-        // إضافة المدفوعات العامة غير المرتبطة بمواعيد
-        const generalPayments = patientPayments.filter(payment => !payment.appointment_id)
-        generalPayments.forEach(payment => {
-          patientTotalPaid += payment.amount || 0
-          if (payment.total_amount_due) {
-            patientTotalDue += payment.total_amount_due
-          }
-        })
+        const patientTotalPaid = sumPayments(patientPayments)
+        const patientTotalDue = summarizePaymentBalances(patientPayments).totalDue
 
         totalPayments += patientTotalPaid
         totalRemaining += Math.max(0, patientTotalDue - patientTotalPaid)
@@ -1255,9 +1209,7 @@ export class ComprehensiveExportService {
       const patientPayments = payments.filter(pay => pay.patient_id === patient.id)
 
       const totalPayments = patientPayments.reduce((sum, payment) => {
-        const amount = payment.status === 'partial' && payment.amount_paid !== undefined
-          ? Number(payment.amount_paid)
-          : Number(payment.amount)
+        const amount = getRevenueTransactionAmount(payment)
         return sum + amount
       }, 0)
 
@@ -2210,7 +2162,7 @@ export class ComprehensiveExportService {
     const payments = Array.isArray(data.payments) ? data.payments : []
 
     // إحصائيات المدفوعات
-    const totalRevenue = payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    const totalRevenue = payments.reduce((sum: number, p: any) => sum + getRevenueTransactionAmount(p), 0)
     const completedPayments = payments.filter((p: any) => p.status === 'completed')
     const partialPayments = payments.filter((p: any) => p.status === 'partial')
     const pendingPayments = payments.filter((p: any) => p.status === 'pending')
@@ -2791,7 +2743,7 @@ export class ComprehensiveExportService {
     let currentRow = 3
 
     // حساب الإحصائيات المالية
-    const totalRevenue = data.payments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0)
+    const totalRevenue = data.payments.reduce((sum: number, p: any) => sum + getRevenueTransactionAmount(p), 0)
     const totalLabCosts = data.labOrders.reduce((sum: number, order: any) => sum + (order.cost || 0), 0)
     const totalClinicNeeds = data.clinicNeeds.reduce((sum: number, need: any) => sum + ((need.price || 0) * (need.quantity || 0)), 0)
     const totalInventoryCosts = data.inventory.reduce((sum: number, item: any) => sum + ((item.cost || 0) * (item.quantity || 0)), 0)
@@ -2843,9 +2795,9 @@ export class ComprehensiveExportService {
     const pendingPayments = data.payments.filter((p: any) => p.status === 'pending')
 
     const revenueData = [
-      ['المدفوعات المكتملة', `${completedPayments.length} (${formatCurrency(completedPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))})`],
-      ['المدفوعات الجزئية', `${partialPayments.length} (${formatCurrency(partialPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))})`],
-      ['المدفوعات المعلقة', `${pendingPayments.length} (${formatCurrency(pendingPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0))})`]
+      ['المدفوعات المكتملة', `${completedPayments.length} (${formatCurrency(completedPayments.reduce((sum: number, p: any) => sum + getRevenueTransactionAmount(p), 0))})`],
+      ['المدفوعات الجزئية', `${partialPayments.length} (${formatCurrency(partialPayments.reduce((sum: number, p: any) => sum + getRevenueTransactionAmount(p), 0))})`],
+      ['المدفوعات المعلقة', `${pendingPayments.length} (${formatCurrency(pendingPayments.reduce((sum: number, p: any) => sum + getRevenueTransactionAmount(p), 0))})`]
     ]
 
     revenueData.forEach(([label, value]) => {

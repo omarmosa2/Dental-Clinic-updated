@@ -1,3 +1,4 @@
+import { summarizePaymentBalances } from '@/services/paymentCore.mjs'
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { Payment } from '../types'
@@ -25,8 +26,8 @@ interface PaymentState {
 interface PaymentActions {
   // Data operations
   loadPayments: () => Promise<void>
-  createPayment: (payment: Omit<Payment, 'id' | 'created_at' | 'updated_at'>) => Promise<void>
-  updatePayment: (id: string, payment: Partial<Payment>) => Promise<void>
+  createPayment: (payment: Omit<Payment, 'id' | 'created_at' | 'updated_at'>) => Promise<Payment>
+  updatePayment: (id: string, payment: Partial<Payment>) => Promise<Payment>
   deletePayment: (id: string) => Promise<void>
   searchPayments: (query: string) => void
 
@@ -252,7 +253,8 @@ export const usePaymentStore = create<PaymentStore>()(
       deletePayment: async (id) => {
         set({ isLoading: true, error: null })
         try {
-          await window.electronAPI.payments.delete(id)
+          const deleted = await window.electronAPI.payments.delete(id)
+          if (!deleted) throw new Error('لم يتم العثور على الدفعة')
           const { payments, selectedPayment } = get()
 
           const updatedPayments = payments.filter(p => p.id !== id)
@@ -272,6 +274,8 @@ export const usePaymentStore = create<PaymentStore>()(
           get().calculateMonthlyRevenue()
           get().calculatePaymentMethodStats()
           get().filterPayments()
+
+          await get().loadPayments()
 
           // Emit events for real-time sync
           if (typeof window !== 'undefined' && window.dispatchEvent) {
@@ -293,6 +297,7 @@ export const usePaymentStore = create<PaymentStore>()(
             error: error instanceof Error ? error.message : 'Failed to delete payment',
             isLoading: false
           })
+          throw error
         }
       },
 
@@ -381,106 +386,11 @@ export const usePaymentStore = create<PaymentStore>()(
       },
 
       calculatePendingAmount: () => {
-        const { payments } = get()
-        const pending = payments
-          .filter(p => p.status === 'pending')
-          .reduce((sum, payment) => {
-            // دالة مساعدة للتحقق من صحة المبالغ
-            const validateAmount = (amount: any): number => {
-              const num = Number(amount)
-              return isNaN(num) || !isFinite(num) ? 0 : Math.round(num * 100) / 100
-            }
-
-            const amount = validateAmount(payment.amount)
-            const totalAmountDue = validateAmount(payment.total_amount_due)
-
-            // للمدفوعات المعلقة، استخدم المبلغ الإجمالي المطلوب أو المتبقي إذا كان متوفراً
-            let pendingAmount = amount
-
-            if (payment.tooth_treatment_id) {
-              // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
-              const treatmentRemaining = validateAmount(payment.treatment_remaining_balance || payment.remaining_balance)
-              const treatmentCost = validateAmount(payment.treatment_total_cost) || totalAmountDue
-              pendingAmount = treatmentRemaining > 0 ? treatmentRemaining : treatmentCost
-            } else if (totalAmountDue > 0) {
-              pendingAmount = totalAmountDue
-            } else {
-              const remainingBalance = validateAmount(payment.remaining_balance)
-              if (remainingBalance > 0) {
-                pendingAmount = remainingBalance
-              }
-            }
-
-            return sum + pendingAmount
-          }, 0)
-
-        const validPending = isNaN(pending) || !isFinite(pending) ? 0 : Math.round(pending * 100) / 100
-        set({ pendingAmount: validPending })
+        set({pendingAmount:summarizePaymentBalances(get().payments).pendingBalance})
       },
 
-
-
       calculateTotalRemainingBalance: () => {
-        const { payments } = get()
-        let totalRemaining = 0
-
-        // دالة مساعدة للتحقق من صحة المبالغ
-        const validateAmount = (amount: any): number => {
-          const num = Number(amount)
-          return isNaN(num) || !isFinite(num) ? 0 : Math.round(num * 100) / 100
-        }
-
-        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالعلاجات
-        const treatmentPayments = payments.filter(p => p.tooth_treatment_id)
-        const treatmentGroups: { [treatmentId: string]: { totalDue: number; totalPaid: number } } = {}
-
-        treatmentPayments.forEach(payment => {
-          const treatmentId = payment.tooth_treatment_id!
-          if (!treatmentGroups[treatmentId]) {
-            treatmentGroups[treatmentId] = { totalDue: 0, totalPaid: 0 }
-          }
-          const group = treatmentGroups[treatmentId]
-          // استخدام التكلفة الإجمالية للعلاج كمرجع (جميع الدفعات لنفس العلاج لها نفس التكلفة)
-          group.totalDue = validateAmount(payment.treatment_total_cost || group.totalDue)
-          // جمع المبالغ المدفوعة من جميع الدفعات (المكتملة والجزئية)
-          if (isRevenuePaymentStatus(payment.status)) {
-            group.totalPaid += getTransactionAmount(payment)
-          }
-        })
-
-        Object.values(treatmentGroups).forEach(group => {
-          totalRemaining += Math.max(0, group.totalDue - group.totalPaid)
-        })
-
-        // حساب المبلغ المتبقي من المدفوعات المرتبطة بالمواعيد
-        const appointmentPayments = payments.filter(p => p.appointment_id && !p.tooth_treatment_id)
-        const appointmentGroups: { [appointmentId: string]: { totalDue: number; totalPaid: number } } = {}
-
-        appointmentPayments.forEach(payment => {
-          const appointmentId = payment.appointment_id!
-          if (!appointmentGroups[appointmentId]) {
-            appointmentGroups[appointmentId] = { totalDue: 0, totalPaid: 0 }
-          }
-          const group = appointmentGroups[appointmentId]
-          group.totalDue = validateAmount(payment.total_amount_due || group.totalDue)
-          if (isRevenuePaymentStatus(payment.status)) {
-            group.totalPaid += getTransactionAmount(payment)
-          }
-        })
-
-        Object.values(appointmentGroups).forEach(group => {
-          totalRemaining += Math.max(0, group.totalDue - group.totalPaid)
-        })
-
-        // حساب المبلغ المتبقي من المدفوعات العامة (فقط من الدفعات الجزئية)
-        const generalPayments = payments.filter(p => !p.appointment_id && !p.tooth_treatment_id && p.status === 'partial')
-        generalPayments.forEach(payment => {
-          const totalDue = validateAmount(payment.total_amount_due || payment.amount)
-          const paid = validateAmount(payment.amount_paid || payment.amount)
-          totalRemaining += Math.max(0, totalDue - paid)
-        })
-
-        set({ totalRemainingBalance: Math.round(totalRemaining * 100) / 100 })
+        set({totalRemainingBalance:summarizePaymentBalances(get().payments).remainingBalance})
       },
 
       calculatePartialPaymentsCount: () => {

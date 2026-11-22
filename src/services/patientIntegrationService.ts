@@ -1,3 +1,4 @@
+import { calculatePatientPaymentSummary } from '@/utils/paymentCalculations'
 import type {
   PatientIntegratedData,
   Patient,
@@ -178,30 +179,10 @@ export class PatientIntegrationService {
     const pendingTreatments = treatments.filter(t => t.treatment_status === 'planned' || t.treatment_status === 'in_progress').length
 
     // حساب المبالغ المالية بالطريقة الصحيحة
-    let totalPaid = 0
-    let totalDue = 0
-
-    // حساب المدفوعات المرتبطة بالمواعيد
-    appointments.forEach(appointment => {
-      if (appointment.cost) {
-        const appointmentPayments = payments.filter(p => p.appointment_id === appointment.id)
-        const appointmentTotalPaid = appointmentPayments.reduce((sum, p) => sum + (p.amount || 0), 0)
-        totalDue += appointment.cost
-        totalPaid += appointmentTotalPaid
-      }
-    })
-
-    // إضافة المدفوعات العامة غير المرتبطة بمواعيد
-    const generalPayments = payments.filter(payment => !payment.appointment_id)
-    generalPayments.forEach(payment => {
-      totalPaid += payment.amount || 0
-      if (payment.total_amount_due) {
-        totalDue += payment.total_amount_due
-      }
-    })
-
-    // حساب المبلغ المتبقي بشكل صحيح: الإجمالي المطلوب - الإجمالي المدفوع
-    const remainingBalance = Math.max(0, totalDue - totalPaid)
+    const patientId = payments[0]?.patient_id || treatments[0]?.patient_id || appointments[0]?.patient_id || ''
+    const summary = calculatePatientPaymentSummary(patientId, payments, appointments, treatments)
+    const totalPaid = summary.totalPaid
+    const remainingBalance = summary.totalRemaining
 
     // آخر زيارة
     const lastVisit = appointments

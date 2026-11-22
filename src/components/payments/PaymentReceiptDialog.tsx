@@ -65,11 +65,11 @@ export default function PaymentReceiptDialog({ open, onOpenChange, payment }: Pa
       let remainingBalance = 0
       if (payment.appointment_id) {
         const totalDue = payment.total_amount_due || payment.appointment_total_cost || 0
-        const totalPaid = payment.amount_paid || payment.amount || 0
+        const totalPaid = payment.amount_paid ?? payment.total_amount ?? payment.amount ?? 0
         remainingBalance = Math.max(0, totalDue - totalPaid)
       } else {
         const totalDue = payment.total_amount_due || payment.amount || 0
-        const paid = payment.amount_paid || payment.amount || 0
+        const paid = payment.amount_paid ?? payment.total_amount ?? payment.amount ?? 0
         remainingBalance = Math.max(0, totalDue - paid)
       }
 
@@ -838,12 +838,12 @@ ${address ? `📍 العنوان: ${address}` : ''}
                     if (payment.appointment_id) {
                       // للمدفوعات المرتبطة بمواعيد
                       const totalDue = payment.total_amount_due || payment.appointment_total_cost || 0
-                      const totalPaid = payment.amount_paid || payment.amount || 0
+                      const totalPaid = payment.amount_paid ?? payment.total_amount ?? payment.amount ?? 0
                       remainingBalance = Math.max(0, totalDue - totalPaid)
                     } else {
                       // للمدفوعات العامة
                       const totalDue = payment.total_amount_due || payment.amount || 0
-                      const paid = payment.amount_paid || payment.amount || 0
+                      const paid = payment.amount_paid ?? payment.total_amount ?? payment.amount ?? 0
                       remainingBalance = Math.max(0, totalDue - paid)
                     }
 
@@ -860,7 +860,7 @@ ${address ? `📍 العنوان: ${address}` : ''}
 
               <div className="total-amount">
                 المبلغ الإجمالي لهذه الدفعة: {formatAmount(
-                  payment.total_amount ||
+                  payment.total_amount ??
                   (payment.amount + (payment.tax_amount || 0) - (payment.discount_amount || 0))
                 )}
               </div>

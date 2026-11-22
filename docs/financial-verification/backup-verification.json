@@ -1,0 +1,10 @@
+{
+  "integrity": "ok",
+  "unchangedTables": {
+    "patients": true,
+    "tooth_treatments": true,
+    "appointments": true,
+    "payments": true
+  },
+  "restoredCopyOpened": true
+}

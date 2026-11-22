@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import { finalAmount, sumPayments, balance, previewPayment, validatePaymentAmounts, getTransactionAmount, isRevenuePaymentStatus } from '@/services/paymentCore.mjs'
+import React, { useState, useEffect, useRef } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +33,7 @@ interface EditPaymentDialogProps {
 }
 
 export default function EditPaymentDialog({ open, onOpenChange, payment }: EditPaymentDialogProps) {
+  const submittingRef = useRef(false)
   const { toast } = useToast()
   const { updatePayment, isLoading, getPaymentsByPatient, getPaymentsByAppointment, getPaymentsByToothTreatment } = usePaymentStore()
   const { patients } = usePatientStore()
@@ -48,7 +50,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
     payment_date: '',
     description: '',
     receipt_number: '',
-    status: 'completed' as 'completed' | 'partial' | 'pending',
+    status: 'completed' as Payment['status'],
     notes: '',
     discount_amount: '',
     tax_amount: '',
@@ -76,9 +78,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
   const calculatePreviousPayments = (appointmentId: string, excludePaymentId: string) => {
     if (!appointmentId || appointmentId === 'none') return 0
     const appointmentPayments = getPaymentsByAppointment(appointmentId)
-    return appointmentPayments
-      .filter(p => p.id !== excludePaymentId)
-      .reduce((total, payment) => total + payment.amount, 0)
+    return sumPayments(appointmentPayments.filter(p => p.id !== excludePaymentId && !p.tooth_treatment_id))
   }
 
   // جلب تكلفة الموعد تلقائياً
@@ -89,29 +89,18 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
   }
 
   // حساب إجمالي المبلغ المدفوع تلقائياً (المدفوعات السابقة + الدفعة الحالية)
-  const calculateTotalAmountPaid = () => {
-    const currentAmount = parseFloat(formData.amount) || 0
-    return autoCalculations.previousPayments + currentAmount
-  }
-
-  // حساب المبلغ المتبقي تلقائياً
-  const calculateRemainingBalance = () => {
-    const totalAmountDue = parseFloat(formData.total_amount_due) || 0
-    const totalPaid = calculateTotalAmountPaid()
-    return Math.max(0, totalAmountDue - totalPaid)
-  }
-
-  // حساب المبلغ الإجمالي للدفعة
-  const calculateTotalAmount = () => {
-    const amount = parseFloat(formData.amount) || 0
-    const taxAmount = parseFloat(formData.tax_amount) || 0
-    const discountAmount = parseFloat(formData.discount_amount) || 0
-    return amount + taxAmount - discountAmount
-  }
+  const getPreview = () => previewPayment({cost:formData.total_amount_due,previousPaid:autoCalculations.previousPayments,
+    amount:formData.amount,discount:formData.discount_amount,tax:formData.tax_amount,
+    countsAsPaid: !['cancelled','refunded','failed','overdue'].includes(formData.status)})
+  const calculateTotalAmountPaid = () => getPreview().totalPaid
+  const calculateRemainingBalance = () => getPreview().remainingBalance
+  const calculateTotalAmount = () => getPreview().totalAmount
 
   // تحديث الحسابات التلقائية عند تغيير الموعد
   useEffect(() => {
-    if (formData.appointment_id && formData.appointment_id !== 'none' && payment) {
+    if (formData.tooth_treatment_id && formData.tooth_treatment_id !== 'none' && payment) {
+      setAutoCalculations({previousPayments:sumPayments(getPaymentsByToothTreatment(formData.tooth_treatment_id).filter(p=>p.id!==payment.id)),originalAmount:payment.amount,isCalculating:false})
+    } else if (formData.appointment_id && formData.appointment_id !== 'none' && payment) {
       setAutoCalculations(prev => ({ ...prev, isCalculating: true }))
 
       const previousPayments = calculatePreviousPayments(formData.appointment_id, payment.id)
@@ -130,7 +119,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
         isCalculating: false
       })
     }
-  }, [formData.appointment_id, payment])
+  }, [formData.appointment_id, formData.tooth_treatment_id, payment, getPaymentsByToothTreatment])
 
   // تحديث المبلغ المطلوب عند تغيير الموعد أو العلاج
   useEffect(() => {
@@ -167,7 +156,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
         amount_paid: totalPaid.toString()
       }))
     }
-  }, [formData.amount, autoCalculations.previousPayments])
+  }, [formData.amount, formData.discount_amount, formData.tax_amount, autoCalculations.previousPayments])
 
   useEffect(() => {
     if (payment && open) {
@@ -203,47 +192,10 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
   }
 
   // اقتراح الحالة تلقائياً بناءً على المبلغ
-  const getSuggestedStatus = (): 'completed' | 'partial' | 'pending' => {
-    const amount = formData.amount ? parseFloat(formData.amount) : 0
-    const totalAmountDue = formData.total_amount_due ? parseFloat(formData.total_amount_due) : 0
-
-    if (totalAmountDue > 0) {
-      if (formData.appointment_id && formData.appointment_id !== 'none') {
-        // للمدفوعات المرتبطة بموعد - استخدام المبلغ الإجمالي المدخل يدوياً
-
-        // حساب المدفوعات السابقة (باستثناء الدفعة الحالية)
-        const otherPayments = getPaymentsByAppointment(formData.appointment_id)
-          .filter(p => p.id !== payment.id)
-        const previousPayments = otherPayments.reduce((sum, p) => sum + p.amount, 0)
-        const newTotalPaid = previousPayments + amount
-
-        if (newTotalPaid >= totalAmountDue) {
-          return 'completed'
-        } else if (newTotalPaid > 0) {
-          return 'partial'
-        } else {
-          return 'pending'
-        }
-      } else {
-        // للمدفوعات العامة
-        const amountPaid = parseFloat(formData.amount_paid) || amount
-
-        if (amountPaid >= totalAmountDue) {
-          return 'completed'
-        } else if (amountPaid > 0) {
-          return 'partial'
-        } else {
-          return 'pending'
-        }
-      }
-    }
-
-    // إذا لم يكن هناك مبلغ إجمالي مطلوب ولكن هناك مبلغ مدفوع
-    if (amount > 0) {
-      return 'completed'
-    }
-
-    return 'pending' // افتراضي للحالات الأخرى
+  const getSuggestedStatus = (): Payment['status'] => {
+    if (['cancelled','refunded','failed','overdue'].includes(formData.status)) return formData.status
+    if (Number(formData.amount) === 0) return 'pending'
+    return getPreview().status
   }
 
   // تحديث الحالة تلقائياً عند تغيير المبلغ أو المبلغ الإجمالي
@@ -259,10 +211,11 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
         status: suggestedStatus
       }))
     }
-  }, [formData.amount, formData.total_amount_due, formData.appointment_id])
+  }, [formData.amount, formData.total_amount_due, formData.appointment_id, formData.tooth_treatment_id, formData.discount_amount, formData.tax_amount, autoCalculations.previousPayments])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current) return
 
     if (!formData.patient_id || !formData.payment_date) {
       toast({
@@ -273,14 +226,20 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
       return
     }
 
+    submittingRef.current = true
     try {
       const amount = formData.amount ? parseFloat(formData.amount) : 0
       const discountAmount = formData.discount_amount ? parseFloat(formData.discount_amount) : 0
       const taxAmount = formData.tax_amount ? parseFloat(formData.tax_amount) : 0
-      const totalAmount = amount + taxAmount - discountAmount
+      validatePaymentAmounts(amount,discountAmount,taxAmount)
+      if (amount <= 0 && !(amount === 0 && payment.amount === 0 && formData.status === 'pending')) throw new Error('يجب أن يكون مبلغ الدفعة أكبر من صفر')
+      const totalAmount = finalAmount(amount,discountAmount,taxAmount)
+      if (isRevenuePaymentStatus(formData.status) && totalAmount <= 0) throw new Error('يجب أن يكون صافي مبلغ الدفعة أكبر من صفر')
+      const linked = formData.tooth_treatment_id !== 'none' || formData.appointment_id !== 'none'
+      if (linked && isRevenuePaymentStatus(formData.status) && totalAmount > balance(Number(formData.total_amount_due)||0,autoCalculations.previousPayments)) throw new Error('مبلغ الدفعة يتجاوز المبلغ المتبقي')
       const totalAmountDue = formData.total_amount_due ? parseFloat(formData.total_amount_due) : totalAmount
       const amountPaid = calculateTotalAmountPaid() // استخدام الحساب التلقائي
-      const remainingBalance = totalAmountDue - amountPaid
+      const remainingBalance = balance(totalAmountDue,amountPaid)
 
       // استخدام معرف العلاج من الدفعة الأصلية إذا كانت مرتبطة بعلاج، وإلا استخدم القيمة من النموذج
       const treatmentId = payment.tooth_treatment_id && payment.tooth_treatment_id !== 'none'
@@ -290,7 +249,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
       const paymentData = {
         patient_id: formData.patient_id,
         tooth_treatment_id: treatmentId,
-        appointment_id: formData.appointment_id && formData.appointment_id !== 'none' ? formData.appointment_id : undefined,
+        appointment_id: !treatmentId && formData.appointment_id && formData.appointment_id !== 'none' ? formData.appointment_id : undefined,
         amount: amount,
         payment_method: formData.payment_method,
         payment_date: formData.payment_date,
@@ -298,8 +257,8 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
         receipt_number: formData.receipt_number || generateReceiptNumber(), // استخدام التوليد التلقائي إذا كان فارغاً
         status: formData.status,
         notes: formData.notes,
-        discount_amount: discountAmount > 0 ? discountAmount : undefined,
-        tax_amount: taxAmount > 0 ? taxAmount : undefined,
+        discount_amount: discountAmount,
+        tax_amount: taxAmount,
         total_amount: totalAmount,
         total_amount_due: totalAmountDue,
         amount_paid: amountPaid,
@@ -322,7 +281,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
         description: error instanceof Error ? error.message : 'فشل في تحديث الدفعة',
         variant: 'destructive',
       })
-    }
+    } finally { submittingRef.current = false }
   }
 
   const filteredAppointments = appointments.filter(
@@ -345,8 +304,8 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
 
       // حساب إجمالي المدفوع (فقط المدفوعات المكتملة والجزئية)
       const totalPaid = treatmentPayments
-        .filter(p => p.status === 'completed' || p.status === 'partial')
-        .reduce((sum, p) => sum + p.amount, 0)
+        .filter(p => isRevenuePaymentStatus(p.status))
+        .reduce((sum, p) => sum + getTransactionAmount(p), 0)
 
       // إخفاء العلاجات المدفوعة بالكامل فقط
       return totalPaid < treatmentCost
@@ -470,7 +429,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                           const treatmentCost = treatment.cost || 0
                           const totalPaid = treatmentPayments
                             .filter(p => p.status === 'completed' || p.status === 'partial')
-                            .reduce((sum, p) => sum + p.amount, 0)
+                            .reduce((sum, p) => sum + getTransactionAmount(p), 0)
                           const remainingAmount = treatmentCost - totalPaid
 
                           return (
@@ -531,7 +490,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                   <Input
                     id="amount"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={formData.amount}
                     onChange={(e) => handleInputChange('amount', e.target.value)}
                     onBlur={(e) => {
@@ -615,6 +574,11 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                           )}
                         </div>
                       </SelectItem>
+                      <SelectItem value="paid">مدفوع</SelectItem>
+                      <SelectItem value="cancelled">ملغى</SelectItem>
+                      <SelectItem value="refunded">مسترد</SelectItem>
+                      <SelectItem value="failed">فاشل</SelectItem>
+                      <SelectItem value="overdue">متأخر</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -626,7 +590,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                   <Input
                     id="discount_amount"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={formData.discount_amount}
                     onChange={(e) => handleInputChange('discount_amount', e.target.value)}
                     onBlur={(e) => {
@@ -643,7 +607,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                   <Input
                     id="tax_amount"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={formData.tax_amount}
                     onChange={(e) => handleInputChange('tax_amount', e.target.value)}
                     onBlur={(e) => {
@@ -726,7 +690,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                   <Input
                     id="total_amount_due"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={formData.total_amount_due}
                     onChange={(e) => handleInputChange('total_amount_due', e.target.value)}
                     onBlur={(e) => {
@@ -763,7 +727,7 @@ export default function EditPaymentDialog({ open, onOpenChange, payment }: EditP
                   <Input
                     id="amount_paid"
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     value={formData.amount_paid}
                     readOnly
                     className="bg-muted cursor-not-allowed border-input text-foreground font-medium"

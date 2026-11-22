@@ -1,0 +1,10 @@
+
+> dental-clinic-management-aggoracode@3.2.0 test:payments:ui
+> node scripts/run-payment-ui-tests.cjs
+
+
+PASS: cancellation creates no receipt
+PASS: failure keeps confirmation and shows error
+PASS: double click submits once, chosen method is retained, success closes confirmation
+PASS: retries retain their request key; a new successful operation can use a fresh key
+PASS: invalid and zero costs disable immediate payment

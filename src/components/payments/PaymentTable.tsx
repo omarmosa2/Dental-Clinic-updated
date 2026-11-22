@@ -106,7 +106,7 @@ export default function PaymentTable({
         }
         const group = groups.get(batchId)!
         group.payments.push(payment)
-        group.totalAmount += payment.total_amount || payment.amount
+        group.totalAmount += payment.total_amount ?? payment.amount
         if (payment.status === 'partial') {
           group.overallStatus = 'partial'
         }
@@ -414,7 +414,7 @@ export default function PaymentTable({
                       </TableCell>
                       <TableCell className="text-center">
                         <div className="font-medium text-green-600 dark:text-green-400">
-                          {formatCurrency(payment.total_amount || payment.amount)}
+                          {formatCurrency(payment.total_amount ?? payment.amount)}
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
@@ -551,7 +551,7 @@ export default function PaymentTable({
                             إجمالي المبلغ المدفوع:
                           </div>
                           <div className="font-medium text-lg text-green-600 dark:text-green-400">
-                            {formatCurrency(payment.total_amount || payment.amount)}
+                            {formatCurrency(payment.total_amount ?? payment.amount)}
                           </div>
                         </div>
                         <div className="space-y-1">

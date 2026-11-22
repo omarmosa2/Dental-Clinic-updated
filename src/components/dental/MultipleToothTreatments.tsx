@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import { useCurrency } from '@/contexts/CurrencyContext'
+import FullPaymentButton from '@/components/payments/FullPaymentButton'
+import { useFinancialRequest } from '@/hooks/useFinancialRequest'
+import { validatePaymentAmounts } from '@/services/paymentCore.mjs'
+import React, { useState, useEffect, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -79,7 +83,11 @@ export default function MultipleToothTreatments({
   onSessionStatsUpdate,
   onTreatmentUpdate
 }: MultipleToothTreatmentsProps) {
+  const { formatAmount } = useCurrency()
   const { isDarkMode } = useTheme()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const paymentRequestKey = useFinancialRequest()
+  const submittingRef = useRef(false)
   const { createPayment, updatePayment, getPaymentsByPatient } = usePaymentStore()
   const { patients } = usePatientStore()
   const { labs, loadLabs } = useLabStore()
@@ -259,18 +267,24 @@ export default function MultipleToothTreatments({
     }
   }
 
-  const handleAddTreatment = async () => {
+  const handleAddTreatment = async (fullPaymentMethod?: 'cash' | 'bank_transfer') => {
+    if (submittingRef.current) return
     if (!newTreatment.treatment_type || !newTreatment.treatment_category) {
       notify.error('يرجى اختيار نوع العلاج والتصنيف')
+      if (fullPaymentMethod) throw new Error('يرجى اختيار نوع العلاج والتصنيف')
       return
     }
 
     // التحقق من بيانات المختبر للتعويضات
     if (newTreatment.treatment_category === 'التعويضات' && addLabCost > 0 && !addSelectedLab) {
       notify.error('يرجى اختيار المختبر عند إدخال تكلفة المختبر للتعويضات')
+      if (fullPaymentMethod) throw new Error('يرجى اختيار المختبر عند إدخال تكلفة المختبر للتعويضات')
       return
     }
 
+    try { validatePaymentAmounts(newTreatment.cost ?? 0) } catch (error) { notify.error((error as Error).message); if (fullPaymentMethod) throw error; return }
+    submittingRef.current = true
+    setIsSubmitting(true)
     let createdTreatmentId: string | null = null
     let createdPaymentId: string | null = null
 
@@ -289,6 +303,10 @@ export default function MultipleToothTreatments({
         treatment_color: getTreatmentByValue(newTreatment.treatment_type!)?.color || '#22c55e'
       } as Omit<ToothTreatment, 'id' | 'created_at' | 'updated_at'>
 
+      if (fullPaymentMethod) {
+        treatmentData.immediate_payment = { payment_method: fullPaymentMethod }
+        treatmentData.request_id = paymentRequestKey(treatmentData)
+      }
       const newTreatmentResult = await onAddTreatment(treatmentData)
 
       if (!newTreatmentResult) {
@@ -296,10 +314,11 @@ export default function MultipleToothTreatments({
       }
 
       createdTreatmentId = newTreatmentResult.id
+      paymentRequestKey.reset()
       console.log('✅ [DEBUG] Treatment created successfully:', createdTreatmentId)
 
       // الخطوة 2: إنشاء دفعة معلقة إذا تم تعبئة التكلفة
-      if (newTreatment.cost && newTreatment.cost > 0) {
+      if (!fullPaymentMethod && newTreatment.cost && newTreatment.cost > 0) {
         console.log('💰 [DEBUG] Creating payment for treatment:', createdTreatmentId)
         try {
           await createPendingPaymentForTreatment(createdTreatmentId)
@@ -342,7 +361,8 @@ export default function MultipleToothTreatments({
       }
 
       notify.error('فشل في إضافة العلاج - يرجى المحاولة مرة أخرى')
-    }
+      if (fullPaymentMethod) throw error
+    } finally { submittingRef.current = false; setIsSubmitting(false) }
   }
 
   const handleUpdateTreatment = async (id: string, updates: Partial<ToothTreatment>) => {
@@ -637,7 +657,7 @@ export default function MultipleToothTreatments({
                   {treatment.cost && (
                     <div className="flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-muted-foreground" />
-                      <span>${treatment.cost}</span>
+                      <span>{formatAmount(treatment.cost)}</span>
                     </div>
                   )}
 
@@ -775,7 +795,7 @@ export default function MultipleToothTreatments({
             "space-y-4 p-6",
             isDarkMode ? "bg-blue-950/10" : "bg-blue-50/30"
           )}>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className={cn(
                   "font-medium",
@@ -789,7 +809,7 @@ export default function MultipleToothTreatments({
                   }}
                 >
                   <SelectTrigger className={cn(
-                    "border-2 transition-colors",
+                    "h-12 w-full min-w-0 border-2 transition-colors",
                     isDarkMode
                       ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
                       : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
@@ -820,7 +840,7 @@ export default function MultipleToothTreatments({
                   disabled={!selectedCategory}
                 >
                   <SelectTrigger className={cn(
-                    "border-2 transition-colors",
+                    "h-12 w-full min-w-0 border-2 transition-colors",
                     !selectedCategory && "opacity-50 cursor-not-allowed",
                     isDarkMode
                       ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
@@ -975,7 +995,7 @@ export default function MultipleToothTreatments({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className={cn(
                   "font-medium",
@@ -999,7 +1019,7 @@ export default function MultipleToothTreatments({
                   }}
                 >
                   <SelectTrigger className={cn(
-                    "border-2 transition-colors",
+                    "h-12 w-full min-w-0 border-2 transition-colors",
                     isDarkMode
                       ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
                       : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
@@ -1016,46 +1036,6 @@ export default function MultipleToothTreatments({
                 </Select>
               </div>
 
-              {/* حقل التكلفة */}
-              <div className="space-y-2">
-                <Label className={cn(
-                  "font-medium",
-                  isDarkMode ? "text-blue-200" : "text-blue-800"
-                )}>التكلفة ($)</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value={newTreatment.cost || ''}
-                  onChange={(e) => {
-                    const value = e.target.value
-                    setNewTreatment(prev => ({
-                      ...prev,
-                      cost: value === '' ? 0 : parseFloat(value) || 0
-                    }))
-                  }}
-                  onBlur={(e) => {
-                    const value = parseFloat(e.target.value) || 0
-                    setNewTreatment(prev => ({ ...prev, cost: value }))
-                  }}
-                  placeholder="0.00"
-                  className={cn(
-                    "border-2 transition-colors",
-                    isDarkMode
-                      ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
-                      : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
-                  )}
-                />
-                {newTreatment.cost && newTreatment.cost > 0 && (
-                  <p className={cn(
-                    "text-xs",
-                    isDarkMode ? "text-blue-300" : "text-blue-600"
-                  )}>
-                    💡 سيتم إنشاء دفعة معلقة في جدول المدفوعات
-                  </p>
-                )}
-              </div>
-
               <div className="space-y-2">
                 <Label className={cn(
                   "font-medium",
@@ -1066,7 +1046,7 @@ export default function MultipleToothTreatments({
                   value={newTreatment.start_date || ''}
                   onChange={(e) => setNewTreatment(prev => ({ ...prev, start_date: e.target.value }))}
                   className={cn(
-                    "border-2 transition-colors",
+                    "h-12 w-full min-w-0 border-2 transition-colors",
                     isDarkMode
                       ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
                       : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
@@ -1074,8 +1054,51 @@ export default function MultipleToothTreatments({
                 />
               </div>
 
+              {/* حقل التكلفة */}
+              <div className="space-y-3 rounded-xl border border-blue-200/70 bg-white/60 p-4 dark:border-blue-800/50 dark:bg-blue-950/20 md:col-span-2">
+                <Label className={cn(
+                  "font-medium",
+                  isDarkMode ? "text-blue-200" : "text-blue-800"
+                )}>تكلفة العلاج</Label>
+                <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={newTreatment.cost || ''}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setNewTreatment(prev => ({
+                        ...prev,
+                        cost: value === '' ? 0 : parseFloat(value) || 0
+                      }))
+                    }}
+                    onBlur={(e) => {
+                      const value = parseFloat(e.target.value) || 0
+                      setNewTreatment(prev => ({ ...prev, cost: value }))
+                    }}
+                    placeholder="0.00"
+                    className={cn(
+                      "h-12 w-full min-w-0 border-2 transition-colors",
+                      isDarkMode
+                        ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
+                        : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
+                    )}
+                  />
+                  <FullPaymentButton amount={newTreatment.cost ?? 0} disabled={isSubmitting} onConfirm={handleAddTreatment} />
+                </div>
+                {(newTreatment.cost ?? 0) > 0 && (
+                  <p className={cn(
+                    "text-xs",
+                    isDarkMode ? "text-blue-300" : "text-blue-600"
+                  )}>
+                    💡 سيتم إنشاء دفعة معلقة في جدول المدفوعات
+                  </p>
+                )}
+              </div>
+
               {/* حقل اختيار الموعد */}
-              <div className="space-y-2">
+              <div className="space-y-2 md:col-span-2">
                 <Label className={cn(
                   "font-medium",
                   isDarkMode ? "text-blue-200" : "text-blue-800"
@@ -1088,7 +1111,7 @@ export default function MultipleToothTreatments({
                   }}
                 >
                   <SelectTrigger className={cn(
-                    "border-2 transition-colors",
+                    "h-12 w-full min-w-0 border-2 transition-colors",
                     isDarkMode
                       ? "border-blue-800/50 bg-blue-950/30 hover:border-blue-700 focus:border-blue-600"
                       : "border-blue-200 bg-white hover:border-blue-300 focus:border-blue-500"
@@ -1194,7 +1217,7 @@ export default function MultipleToothTreatments({
                   <Input
                     type="number"
                     min="0"
-                    step="0.1"
+                    step="0.01"
                     value={addLabCost || ''}
                     onChange={(e) => {
                       const value = e.target.value
@@ -1274,7 +1297,7 @@ export default function MultipleToothTreatments({
                 إلغاء
               </Button>
               <Button
-                onClick={handleAddTreatment}
+                onClick={() => handleAddTreatment()} disabled={isSubmitting}
                 className={cn(
                   "transition-all duration-200 shadow-lg",
                   isDarkMode
@@ -1383,8 +1406,6 @@ interface EditTreatmentFormProps {
 
 function EditTreatmentFormContent({ treatment, onSave, onCancel }: EditTreatmentFormProps) {
   const { isDarkMode } = useTheme()
-  const { createPayment, updatePayment, getPaymentsByPatient } = usePaymentStore()
-  const { patients } = usePatientStore()
   const { labs, loadLabs } = useLabStore()
   const { createLabOrder, getLabOrdersByTreatment, updateLabOrder, deleteLabOrder, loadLabOrders } = useLabOrderStore()
   const { appointments, loadAppointments } = useAppointmentStore()
@@ -1581,86 +1602,9 @@ function EditTreatmentFormContent({ treatment, onSave, onCancel }: EditTreatment
 
   // دالة تحديث المدفوعات المرتبطة بالعلاج المُعدّل
   const updatePaymentsForEditedTreatment = async () => {
-    try {
-      // الحصول على بيانات المريض
-      const patient = patients.find(p => p.id === treatment.patient_id)
-      if (!patient) {
-        notify.error('لم يتم العثور على بيانات المريض')
-        return
-      }
-
-      // البحث عن جميع المدفوعات المرتبطة بهذا العلاج المحدد
-      const patientPayments = getPaymentsByPatient(treatment.patient_id)
-      const treatmentPayments = patientPayments.filter(payment =>
-        payment.tooth_treatment_id === treatment.id
-      )
-
-      // إنشاء وصف للدفعة
-      const treatmentTypeInfo = getTreatmentByValue(editData.treatment_type!)
-      const description = `علاج ${treatmentTypeInfo?.label || editData.treatment_type} - سن ${treatment.tooth_name || treatment.tooth_number}`
-
-      if (treatmentPayments.length > 0) {
-        // حساب إجمالي المدفوع لهذا العلاج (من جميع المدفوعات)
-        const totalPaidForTreatment = treatmentPayments.reduce((sum, p) => sum + p.amount, 0)
-        const newCost = editData.cost || 0
-        const remainingBalance = Math.max(0, newCost - totalPaidForTreatment)
-
-        // تحديد الحالة الجديدة
-        let newStatus: 'completed' | 'partial' | 'pending'
-        if (newCost <= 0) {
-          // إذا كانت التكلفة صفر أو أقل، اجعل الحالة مكتملة
-          newStatus = 'completed'
-        } else if (remainingBalance <= 0 && totalPaidForTreatment > 0) {
-          newStatus = 'completed'
-        } else if (totalPaidForTreatment > 0) {
-          newStatus = 'partial'
-        } else {
-          newStatus = 'pending'
-        }
-
-        // تحديث جميع المدفوعات المرتبطة بالعلاج
-        for (const payment of treatmentPayments) {
-          const updatedPaymentData = {
-            tooth_treatment_id: treatment.id,
-            description: description,
-            notes: `دفعة لعلاج سن ${treatment.tooth_name || treatment.tooth_number} (تم تعديل التكلفة)`,
-            total_amount_due: newCost,
-            remaining_balance: remainingBalance,
-            treatment_total_cost: newCost,
-            treatment_total_paid: totalPaidForTreatment,
-            treatment_remaining_balance: remainingBalance,
-            status: newStatus
-          }
-
-          await updatePayment(payment.id, updatedPaymentData)
-        }
-        notify.success('تم تحديث المدفوعات المرتبطة بالعلاج')
-      } else if ((editData.cost || 0) > 0) {
-        // إنشاء دفعة معلقة جديدة إذا لم توجد مدفوعات سابقة وكانت التكلفة أكبر من صفر
-        const paymentData = {
-          patient_id: treatment.patient_id,
-          tooth_treatment_id: treatment.id,
-          amount: 0,
-          payment_method: 'cash' as const,
-          payment_date: new Date().toISOString().split('T')[0],
-          description: description,
-          status: 'pending' as const,
-          notes: `دفعة معلقة لعلاج سن ${treatment.tooth_name || treatment.tooth_number} (تم تعديل التكلفة)`,
-          total_amount_due: editData.cost || 0,
-          amount_paid: 0,
-          remaining_balance: editData.cost || 0,
-          treatment_total_cost: editData.cost || 0,
-          treatment_total_paid: 0,
-          treatment_remaining_balance: editData.cost || 0
-        }
-
-        await createPayment(paymentData)
-        notify.success('تم إنشاء دفعة معلقة في جدول المدفوعات')
-      }
-    } catch (error) {
-      console.error('خطأ في تحديث المدفوعات:', error)
-      notify.error('فشل في تحديث المدفوعات')
-    }
+    // Cost edits refresh live balances; receipt amounts, notes and lifecycle states stay intact.
+    await usePaymentStore.getState().loadPayments()
+    window.dispatchEvent(new CustomEvent('payment-changed', {detail:{type:'balance-updated',treatmentId:treatment.id}}))
   }
 
   const handleSave = async () => {
@@ -1996,11 +1940,11 @@ function EditTreatmentFormContent({ treatment, onSave, onCancel }: EditTreatment
           <Label className={cn(
             "font-medium",
             isDarkMode ? "text-orange-200" : "text-orange-800"
-          )}>التكلفة ($)</Label>
+          )}>تكلفة العلاج</Label>
           <Input
             type="number"
             min="0"
-            step="0.1"
+            step="0.01"
             value={editData.cost || ''}
             onChange={(e) => {
               // منع انتشار حدث التغيير
@@ -2261,7 +2205,7 @@ function EditTreatmentFormContent({ treatment, onSave, onCancel }: EditTreatment
               key={`lab-cost-${treatment.id}-${labCost}`}
               type="number"
               min="0"
-              step="0.1"
+              step="0.01"
               value={labCost || ''}
               onChange={(e) => {
                 // منع انتشار حدث التغيير

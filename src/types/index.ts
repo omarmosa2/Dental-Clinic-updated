@@ -47,6 +47,7 @@ export interface Appointment {
 }
 
 export interface Payment {
+  request_id?: string // Stable identifier for retrying a new operation.
   id: string
   patient_id: string
   tooth_treatment_id?: string // ربط مباشر بعلاج السن
@@ -323,6 +324,9 @@ export interface PrescriptionMedication {
 
 // Multiple treatments per tooth interface
 export interface ToothTreatment {
+  request_id?: string
+  immediate_payment?: { payment_method: 'cash' | 'bank_transfer'; payment_date?: string }
+  immediate_payment_id?: string
   id: string
   patient_id: string
   tooth_number: number

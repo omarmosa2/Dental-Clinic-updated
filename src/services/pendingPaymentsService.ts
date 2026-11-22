@@ -1,3 +1,4 @@
+import { sumPayments, balance } from '@/services/paymentCore.mjs'
 import {
   Payment,
   Appointment,
@@ -109,6 +110,7 @@ export class PendingPaymentsService {
       // تحويل المدفوعات إلى عناصر فاتورة
       const pendingItems: PendingPaymentItem[] = []
 
+      const seen = new Set<string>()
       for (const payment of filteredPayments) {
         // البحث عن الموعد المرتبط
         const appointment = payment.appointment_id
@@ -141,13 +143,13 @@ export class PendingPaymentsService {
         if (payment.tooth_treatment_id) {
           // دفعة مرتبطة بعلاج مباشرة
           totalAmountDue = payment.treatment_total_cost || 0
-          remainingBalance = payment.treatment_remaining_balance || 0
-          pendingAmount = remainingBalance > 0 ? remainingBalance : totalAmountDue
+          remainingBalance = balance(relatedTreatment?.cost ?? totalAmountDue,sumPayments(safePayments.filter(p=>p.tooth_treatment_id===payment.tooth_treatment_id)))
+          pendingAmount = remainingBalance
         } else if (payment.appointment_id) {
           // دفعة مرتبطة بموعد
           totalAmountDue = payment.appointment_total_cost || payment.total_amount_due || 0
-          remainingBalance = payment.appointment_remaining_balance || payment.remaining_balance || 0
-          pendingAmount = remainingBalance > 0 ? remainingBalance : totalAmountDue
+          remainingBalance = balance(appointment?.cost ?? totalAmountDue,sumPayments(safePayments.filter(p=>p.appointment_id===payment.appointment_id && !p.tooth_treatment_id)))
+          pendingAmount = remainingBalance
         } else {
           // دفعة عامة
           totalAmountDue = payment.total_amount_due || 0
@@ -160,6 +162,10 @@ export class PendingPaymentsService {
             pendingAmount = remainingBalance
           }
         }
+
+        const linkedKey = payment.tooth_treatment_id || payment.appointment_id || payment.id
+        if (pendingAmount <= 0 || seen.has(linkedKey)) continue
+        seen.add(linkedKey)
 
         // تحضير اسم العلاج بالعربية
         let treatmentTypeArabic: string | undefined

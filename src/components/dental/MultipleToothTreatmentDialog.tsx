@@ -1,4 +1,7 @@
-import React, { useState, useEffect } from 'react'
+import FullPaymentButton from '@/components/payments/FullPaymentButton'
+import { useFinancialRequest } from '@/hooks/useFinancialRequest'
+import { validatePaymentAmounts } from '@/services/paymentCore.mjs'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -51,6 +54,8 @@ export default function MultipleToothTreatmentDialog({
   onAddTreatments
 }: MultipleToothTreatmentDialogProps) {
   const { isDarkMode } = useTheme()
+  const paymentRequestKey = useFinancialRequest()
+  const submittingRef = useRef(false)
   const { labs, loadLabs } = useLabStore()
   const { createPayment } = usePaymentStore()
   const { createLabOrder } = useLabOrderStore()
@@ -208,18 +213,23 @@ export default function MultipleToothTreatmentDialog({
     }
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (fullPaymentMethod?: 'cash' | 'bank_transfer') => {
+    if (submittingRef.current) return
     if (!treatmentData.treatment_type || !treatmentData.treatment_category) {
       notify.error('يرجى اختيار نوع العلاج والتصنيف')
+      if (fullPaymentMethod) throw new Error('يرجى اختيار نوع العلاج والتصنيف')
       return
     }
 
     // التحقق من بيانات المختبر للتعويضات
     if (treatmentData.treatment_category === 'التعويضات' && labCost > 0 && !selectedLab) {
       notify.error('يرجى اختيار المختبر عند إدخال تكلفة المختبر للتعويضات')
+      if (fullPaymentMethod) throw new Error('يرجى اختيار المختبر عند إدخال تكلفة المختبر للتعويضات')
       return
     }
 
+    try { validatePaymentAmounts(treatmentData.cost ?? 0) } catch (error) { notify.error((error as Error).message); if (fullPaymentMethod) throw error; return }
+    submittingRef.current = true
     setIsSubmitting(true)
 
     try {
@@ -246,6 +256,10 @@ export default function MultipleToothTreatmentDialog({
         priority: 0
       }
 
+      if (fullPaymentMethod) {
+        treatmentToCreate.immediate_payment = { payment_method: fullPaymentMethod }
+        treatmentToCreate.request_id = paymentRequestKey(treatmentToCreate)
+      }
       const createdTreatments = await onAddTreatments([treatmentToCreate])
 
       if (!createdTreatments || createdTreatments.length === 0) {
@@ -253,9 +267,10 @@ export default function MultipleToothTreatmentDialog({
       }
 
       const createdTreatment = createdTreatments[0]
+      paymentRequestKey.reset()
       const treatmentId = createdTreatment.id
 
-      if (treatmentData.cost && treatmentData.cost > 0) {
+      if (!fullPaymentMethod && treatmentData.cost && treatmentData.cost > 0) {
         try {
           await createPendingPaymentForTreatment(treatmentId, sortedSelectedTeeth)
           paymentSuccessCount++
@@ -285,14 +300,16 @@ export default function MultipleToothTreatmentDialog({
         successMessage += ' وطلب مختبر واحد'
       }
 
-      notify.success(successMessage)
+      notify.success(fullPaymentMethod ? 'تم حفظ العلاج وتسجيل دفع كامل المبلغ' : successMessage)
       resetForm()
       onOpenChange(false)
 
     } catch (error) {
       console.error('Error adding multiple treatments:', error)
       notify.error('فشل في إضافة العلاج المشترك')
+      if (fullPaymentMethod) throw error
     } finally {
+      submittingRef.current = false
       setIsSubmitting(false)
     }
   }
@@ -353,7 +370,7 @@ export default function MultipleToothTreatmentDialog({
           <div className="space-y-2">
             <Label>تصنيف العلاج</Label>
             <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-              <SelectTrigger>
+              <SelectTrigger className="h-12 w-full min-w-0">
                 <SelectValue placeholder="اختر تصنيف العلاج" />
               </SelectTrigger>
               <SelectContent>
@@ -377,7 +394,7 @@ export default function MultipleToothTreatmentDialog({
                 value={treatmentData.treatment_type || ''} 
                 onValueChange={handleTreatmentTypeChange}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-12 w-full min-w-0">
                   <SelectValue placeholder="اختر نوع العلاج" />
                 </SelectTrigger>
                 <SelectContent>
@@ -398,10 +415,11 @@ export default function MultipleToothTreatmentDialog({
           )}
 
           {/* Treatment Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>التكلفة</Label>
-              <Input
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-3 rounded-xl border border-blue-200/70 bg-blue-50/40 p-4 dark:border-blue-800/50 dark:bg-blue-950/20">
+              <Label>تكلفة العلاج</Label>
+              <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+                <Input className="h-12 w-full min-w-0"
                 type="number"
                 min="0"
                 step="0.01"
@@ -412,6 +430,8 @@ export default function MultipleToothTreatmentDialog({
                 }))}
                 placeholder="0.00"
               />
+                <FullPaymentButton amount={treatmentData.cost ?? 0} disabled={isSubmitting} onConfirm={handleSubmit} />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -440,7 +460,7 @@ export default function MultipleToothTreatmentDialog({
                   <div className="space-y-2">
                     <Label>المختبر</Label>
                     <Select value={selectedLab} onValueChange={setSelectedLab}>
-                      <SelectTrigger>
+                      <SelectTrigger className="h-12 w-full min-w-0">
                         <SelectValue placeholder="اختر المختبر" />
                       </SelectTrigger>
                       <SelectContent>
@@ -493,7 +513,7 @@ export default function MultipleToothTreatmentDialog({
               إلغاء
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit()}
               disabled={isSubmitting || !treatmentData.treatment_type}
               className="bg-blue-600 hover:bg-blue-700 text-white"
             >

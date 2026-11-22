@@ -194,7 +194,7 @@ export default function PaymentDetailsDialog({
                     إجمالي المبلغ المدفوع:
                   </div>
                   <div className="font-medium text-2xl text-green-600 dark:text-green-400">
-                    {formatAmount(payment.total_amount || payment.amount)}
+                    {formatAmount(payment.total_amount ?? payment.amount)}
                   </div>
                 </div>
 
@@ -247,7 +247,7 @@ export default function PaymentDetailsDialog({
                     </div>
                     <div className="text-lg font-bold text-purple-600 dark:text-purple-400">
                       {formatAmount(
-                        payment.total_amount ||
+                        payment.total_amount ??
                         (payment.amount + (payment.tax_amount || 0) - (payment.discount_amount || 0))
                       )}
                     </div>

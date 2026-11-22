@@ -9,8 +9,8 @@ if (!dbPath) {
 }
 
 const db = new Database(path.resolve(dbPath), { readonly: true })
-const money = (value) => Math.round((Number(value) || 0) * 100) / 100
-const differs = (a, b) => Math.abs(money(a) - money(b)) > 0.01
+const { money, cents } = require('../services/paymentCore.mjs')
+const differs = (a, b) => cents(a) !== cents(b)
 
 const issues = []
 
@@ -27,10 +27,10 @@ function checkTreatmentPayments() {
       p.remaining_balance,
       tt.cost as direct_cost,
       (
-        SELECT COALESCE(SUM(p2.amount), 0)
+        SELECT COALESCE(SUM(ROUND(COALESCE(p2.total_amount, p2.amount, 0) * 100)) / 100.0, 0)
         FROM payments p2
         WHERE p2.tooth_treatment_id = p.tooth_treatment_id
-          AND COALESCE(p2.status, 'completed') IN ('completed', 'partial')
+          AND COALESCE(p2.status, 'completed') IN ('completed', 'partial', 'paid')
           AND (
             p2.payment_date < p.payment_date
             OR (p2.payment_date = p.payment_date AND p2.created_at <= p.created_at)
@@ -39,7 +39,7 @@ function checkTreatmentPayments() {
     FROM payments p
     JOIN tooth_treatments tt ON tt.id = p.tooth_treatment_id
     WHERE p.tooth_treatment_id IS NOT NULL
-      AND COALESCE(p.status, 'completed') IN ('completed', 'partial')
+      AND COALESCE(p.status, 'completed') IN ('completed', 'partial', 'paid')
   `).all()
 
   rows.forEach((row) => {
@@ -84,11 +84,11 @@ function checkAppointmentPayments() {
       p.remaining_balance,
       a.cost as direct_cost,
       (
-        SELECT COALESCE(SUM(p2.amount), 0)
+        SELECT COALESCE(SUM(ROUND(COALESCE(p2.total_amount, p2.amount, 0) * 100)) / 100.0, 0)
         FROM payments p2
         WHERE p2.appointment_id = p.appointment_id
           AND p2.tooth_treatment_id IS NULL
-          AND COALESCE(p2.status, 'completed') IN ('completed', 'partial')
+          AND COALESCE(p2.status, 'completed') IN ('completed', 'partial', 'paid')
           AND (
             p2.payment_date < p.payment_date
             OR (p2.payment_date = p.payment_date AND p2.created_at <= p.created_at)
@@ -98,7 +98,7 @@ function checkAppointmentPayments() {
     JOIN appointments a ON a.id = p.appointment_id
     WHERE p.appointment_id IS NOT NULL
       AND p.tooth_treatment_id IS NULL
-      AND COALESCE(p.status, 'completed') IN ('completed', 'partial')
+      AND COALESCE(p.status, 'completed') IN ('completed', 'partial', 'paid')
   `).all()
 
   rows.forEach((row) => {

@@ -1,0 +1,33 @@
+
+> dental-clinic-management-aggoracode@3.2.0 typecheck:payments
+> node scripts/check-financial-types.cjs
+
+warning: in the working copy of 'src/components/dental/MultipleToothTreatmentDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/dental/MultipleToothTreatments.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/patients/PatientDetailsModal.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/AddPaymentDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/AppointmentPaymentSummary.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/EditPaymentDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/PaymentDetailsDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/PaymentReceiptDialog.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/payments/PaymentTable.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/components/reports/FinancialReports.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/pages/Payments.tsx', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/comprehensiveExportService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/databaseService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/patientIntegrationService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/pendingPaymentsService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/services/reportsService.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/store/dentalTreatmentStore.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/store/paymentStore.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/types/index.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/utils/exportValidation.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/utils/financialValidation.ts', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'src/utils/paymentCalculations.ts', LF will be replaced by CRLF the next time Git touches it
+baseline 1536 TypeScript errors
+current 1530 TypeScript errors
+{
+  "baselineErrors": 1536,
+  "currentErrors": 1530,
+  "newErrors": []
+}

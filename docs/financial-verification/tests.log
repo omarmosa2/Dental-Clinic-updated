@@ -1,0 +1,550 @@
+
+> dental-clinic-management-aggoracode@3.2.0 test:payments
+> node scripts/run-financial-tests.cjs --test tests/payments.test.cjs tests/payment-frontend.test.cjs
+
+TAP version 13
+# 🔍 calculateFinancialStats called with validated data: {
+#   paymentsCount: 4,
+#   labOrdersCount: 0,
+#   clinicNeedsCount: 0,
+#   inventoryItemsCount: 0,
+#   expensesCount: 0
+# }
+# 💰 Financial calculations verification: {
+#   totalRevenue: 50,
+#   totalExpenses: 0,
+#   netProfit: 50,
+#   profitMargin: 100,
+#   breakdown: {
+#     labOrdersTotal: 0,
+#     clinicNeedsTotal: 0,
+#     inventoryExpenses: 0,
+#     clinicExpensesTotal: 0
+#   }
+# }
+# 🔍 calculateFinancialStats called with validated data: {
+#   paymentsCount: 3,
+#   labOrdersCount: 0,
+#   clinicNeedsCount: 0,
+#   inventoryItemsCount: 0,
+#   expensesCount: 0
+# }
+# 💰 Financial calculations verification: {
+#   totalRevenue: 30,
+#   totalExpenses: 0,
+#   netProfit: 30,
+#   profitMargin: 100,
+#   breakdown: {
+#     labOrdersTotal: 0,
+#     clinicNeedsTotal: 0,
+#     inventoryExpenses: 0,
+#     clinicExpensesTotal: 0
+#   }
+# }
+# Subtest: frontend summary agrees with net backend revenue without cumulative double counting
+ok 1 - frontend summary agrees with net backend revenue without cumulative double counting
+  ---
+  duration_ms: 8.2655
+  type: 'test'
+  ...
+# Subtest: appointment summary excludes rejected payments and dual-linked treatment receipts
+ok 2 - appointment summary excludes rejected payments and dual-linked treatment receipts
+  ---
+  duration_ms: 0.7243
+  type: 'test'
+  ...
+# Subtest: unpaid treatments with no payment rows still contribute to patient debt
+ok 3 - unpaid treatments with no payment rows still contribute to patient debt
+  ---
+  duration_ms: 0.407
+  type: 'test'
+  ...
+# Subtest: frontend validation rejects nonfinite, zero, excessive and overprecision amounts
+ok 4 - frontend validation rejects nonfinite, zero, excessive and overprecision amounts
+  ---
+  duration_ms: 0.9435
+  type: 'test'
+  ...
+# Subtest: fully paid pending placeholders never appear as new debt on pending invoices
+ok 5 - fully paid pending placeholders never appear as new debt on pending invoices
+  ---
+  duration_ms: 7.0288
+  type: 'test'
+  ...
+# Subtest: export totals and grouped balances agree, including settled zero placeholders
+ok 6 - export totals and grouped balances agree, including settled zero placeholders
+  ---
+  duration_ms: 12.8023
+  type: 'test'
+  ...
+# Subtest: both payment forms preview the same net value, excluding cancelled receipts
+ok 7 - both payment forms preview the same net value, excluding cancelled receipts
+  ---
+  duration_ms: 7.5414
+  type: 'test'
+  ...
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 [DEBUG] getPaymentsByPatient() called with patientId: p
+# 🔍 [DEBUG] this.checkColumnExists type: function
+# 🔍 [DEBUG] this object keys: [ 'db' ]
+# 🔍 [DEBUG] checkColumnExists called with: { tableName: 'payments', columnName: 'tooth_treatment_id' }
+# 🔍 [DEBUG] Column exists result: {
+#   tableName: 'payments',
+#   columnName: 'tooth_treatment_id',
+#   exists: true
+# }
+# 📊 [DEBUG] Raw payments from database for patient: 2
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 Raw payments from DB (JS): {
+#   first_payment: {
+#     id: 'd66e03db-df2a-49ca-bfba-f82e4c3a4d33',
+#     appointment_id: null,
+#     total_amount_due: 50,
+#     amount_paid: 50,
+#     remaining_balance: 0
+#   },
+#   hasToothTreatmentId: true
+# }
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 Raw payments from DB (JS): {
+#   first_payment: {
+#     id: '49e25d89-2293-4ca8-968e-96b3ac9b1406',
+#     appointment_id: null,
+#     total_amount_due: 0.3,
+#     amount_paid: 0.3,
+#     remaining_balance: 0
+#   },
+#   hasToothTreatmentId: true
+# }
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 [DEBUG] getPaymentsByPatient() called with patientId: p
+# 🔍 [DEBUG] this.checkColumnExists type: function
+# 🔍 [DEBUG] this object keys: [ 'db' ]
+# 🔍 [DEBUG] checkColumnExists called with: { tableName: 'payments', columnName: 'tooth_treatment_id' }
+# 🔍 [DEBUG] Column exists result: {
+#   tableName: 'payments',
+#   columnName: 'tooth_treatment_id',
+#   exists: true
+# }
+# 📊 [DEBUG] Raw payments from database for patient: 1
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 [DEBUG] getPaymentsByPatient() called with patientId: p
+# 🔍 [DEBUG] this.checkColumnExists type: function
+# 🔍 [DEBUG] this object keys: [ 'db' ]
+# 🔍 [DEBUG] checkColumnExists called with: { tableName: 'payments', columnName: 'tooth_treatment_id' }
+# 🔍 [DEBUG] Column exists result: {
+#   tableName: 'payments',
+#   columnName: 'tooth_treatment_id',
+#   exists: true
+# }
+# 📊 [DEBUG] Raw payments from database for patient: 1
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# 🔍 Raw payments from DB (JS): {
+#   first_payment: {
+#     id: '5d002c66-da52-4368-bfff-f4039586f038',
+#     appointment_id: null,
+#     total_amount_due: 50,
+#     amount_paid: 30,
+#     remaining_balance: 20
+#   },
+#   hasToothTreatmentId: true
+# }
+# 🔍 Raw payments from DB (JS): {
+#   first_payment: {
+#     id: '74ba7dde-af47-46f4-80db-adff8290b9a6',
+#     appointment_id: null,
+#     total_amount_due: 50,
+#     amount_paid: 50,
+#     remaining_balance: 0
+#   },
+#   hasToothTreatmentId: true
+# }
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# Subtest: baseline: separate inserts keep 30 and 20 for a 50 treatment
+ok 8 - baseline: separate inserts keep 30 and 20 for a 50 treatment
+  ---
+  duration_ms: 99.6648
+  type: 'test'
+  ...
+# Subtest: baseline: editing 30 to 35 excludes the existing payment
+ok 9 - baseline: editing 30 to 35 excludes the existing payment
+  ---
+  duration_ms: 38.7239
+  type: 'test'
+  ...
+# Subtest: 30 + 20 never changes the first receipt or its historical fields
+ok 10 - 30 + 20 never changes the first receipt or its historical fields
+  ---
+  duration_ms: 71.2108
+  type: 'test'
+  ...
+# Subtest: edits use the other receipts only; deleting a receipt releases its balance
+ok 11 - edits use the other receipts only; deleting a receipt releases its balance
+  ---
+  duration_ms: 37.3493
+  type: 'test'
+  ...
+# Subtest: cancelled stays excluded after new receipts
+ok 12 - cancelled stays excluded after new receipts
+  ---
+  duration_ms: 27.8298
+  type: 'test'
+  ...
+# Subtest: refunded stays excluded after new receipts
+ok 13 - refunded stays excluded after new receipts
+  ---
+  duration_ms: 31.9433
+  type: 'test'
+  ...
+# Subtest: failed stays excluded after new receipts
+ok 14 - failed stays excluded after new receipts
+  ---
+  duration_ms: 34.6401
+  type: 'test'
+  ...
+# Subtest: pending stays excluded after new receipts
+ok 15 - pending stays excluded after new receipts
+  ---
+  duration_ms: 40.1738
+  type: 'test'
+  ...
+# Subtest: overdue stays excluded after new receipts
+ok 16 - overdue stays excluded after new receipts
+  ---
+  duration_ms: 39.9985
+  type: 'test'
+  ...
+# Subtest: discount and tax use the same net receipt in validation and every summary
+ok 17 - discount and tax use the same net receipt in validation and every summary
+  ---
+  duration_ms: 42.4299
+  type: 'test'
+  ...
+# Subtest: minor-unit arithmetic: 0.10 and 0.20 settle 0.30
+ok 18 - minor-unit arithmetic: 0.10 and 0.20 settle 0.30
+  ---
+  duration_ms: 33.9749
+  type: 'test'
+  ...
+# Subtest: reject malformed amount -1
+ok 19 - reject malformed amount -1
+  ---
+  duration_ms: 21.987
+  type: 'test'
+  ...
+# Subtest: reject malformed amount NaN
+ok 20 - reject malformed amount NaN
+  ---
+  duration_ms: 19.4329
+  type: 'test'
+  ...
+# Subtest: reject malformed amount Infinity
+ok 21 - reject malformed amount Infinity
+  ---
+  duration_ms: 19.3292
+  type: 'test'
+  ...
+# Subtest: reject malformed amount 0.001
+ok 22 - reject malformed amount 0.001
+  ---
+  duration_ms: 19.2253
+  type: 'test'
+  ...
+# Subtest: reject malformed amount 30
+ok 23 - reject malformed amount 30
+  ---
+  duration_ms: 22.8194
+  type: 'test'
+  ...
+# Subtest: reject malformed amount null
+ok 24 - reject malformed amount null
+  ---
+  duration_ms: 23.5852
+  type: 'test'
+  ...
+# Subtest: reject malformed amount undefined
+ok 25 - reject malformed amount undefined
+  ---
+  duration_ms: 21.904
+  type: 'test'
+  ...
+# Subtest: zero is allowed only as a pending compatibility placeholder
+ok 26 - zero is allowed only as a pending compatibility placeholder
+  ---
+  duration_ms: 22.7837
+  type: 'test'
+  ...
+# Subtest: record validation checks ownership, method, date and adjustments
+ok 27 - record validation checks ownership, method, date and adjustments
+  ---
+  duration_ms: 27.2566
+  type: 'test'
+  ...
+# Subtest: request keys make retries idempotent and reject changed payloads
+ok 28 - request keys make retries idempotent and reject changed payloads
+  ---
+  duration_ms: 28.5804
+  type: 'test'
+  ...
+# Subtest: two competing overpayments cannot both commit
+ok 29 - two competing overpayments cannot both commit
+  ---
+  duration_ms: 24.0401
+  type: 'test'
+  ...
+# Subtest: immediate payment creates a real linked receipt atomically and retries once
+ok 30 - immediate payment creates a real linked receipt atomically and retries once
+  ---
+  duration_ms: 28.7574
+  type: 'test'
+  ...
+# Subtest: failure inserting immediate receipt rolls back the treatment and request journal
+ok 31 - failure inserting immediate receipt rolls back the treatment and request journal
+  ---
+  duration_ms: 28.8186
+  type: 'test'
+  ...
+# Subtest: ordinary treatment creation produces no immediate receipt
+ok 32 - ordinary treatment creation produces no immediate receipt
+  ---
+  duration_ms: 22.0493
+  type: 'test'
+  ...
+# Subtest: invalid immediate costs never create a treatment
+ok 33 - invalid immediate costs never create a treatment
+  ---
+  duration_ms: 26.2001
+  type: 'test'
+  ...
+# Subtest: comprehensive receipt preserves placeholders, distributes net adjustments once, and retries
+ok 34 - comprehensive receipt preserves placeholders, distributes net adjustments once, and retries
+  ---
+  duration_ms: 33.0092
+  type: 'test'
+  ...
+# Subtest: editing a payment failure rolls back the current receipt
+ok 35 - editing a payment failure rolls back the current receipt
+  ---
+  duration_ms: 23.7781
+  type: 'test'
+  ...
+# Subtest: reordering treatments preserves every linked receipt and identifier
+ok 36 - reordering treatments preserves every linked receipt and identifier
+  ---
+  duration_ms: 26.4823
+  type: 'test'
+  ...
+# Subtest: cost edits update live balances without rewriting receipts, and reject costs below collected amounts
+ok 37 - cost edits update live balances without rewriting receipts, and reject costs below collected amounts
+  ---
+  duration_ms: 30.0514
+  type: 'test'
+  ...
+# Subtest: remaining-balance cards group all receipts once and remove fully settled debt
+ok 38 - remaining-balance cards group all receipts once and remove fully settled debt
+  ---
+  duration_ms: 41.8421
+  type: 'test'
+  ...
+# ✅ Added appointment_total_cost column to payments table
+# ✅ Added appointment_total_paid column to payments table
+# ✅ Added appointment_remaining_balance column to payments table
+# Creating appointment with data: {
+#   patient_id: 'p',
+#   treatment_id: null,
+#   title: 'Test visit',
+#   start_time: '2026-11-18T10:00:00',
+#   end_time: '2026-11-18T10:30:00'
+# }
+# ✅ Appointment inserted, changes: 1
+# 💾 Forcing WAL checkpoint...
+# 💾 Checkpoint result: [ { busy: 0, log: -1, checkpointed: -1 } ]
+# ✅ Appointment created successfully: 44ac267b-a06e-45fc-825c-d059dad7e8bb
+# Current settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Updated settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Current settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Updated settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Current settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Updated settings table columns: [
+#   'id',                   'clinic_name',
+#   'doctor_name',          'clinic_address',
+#   'clinic_phone',         'clinic_email',
+#   'clinic_logo',          'currency',
+#   'language',             'timezone',
+#   'backup_frequency',     'auto_save_interval',
+#   'appointment_duration', 'working_hours_start',
+#   'working_hours_end',    'working_days',
+#   'app_password',         'password_enabled',
+#   'security_question',    'security_answer',
+#   'created_at',           'updated_at'
+# ]
+# Subtest: real independent SQLite connections serialize competing payments and repeated request keys
+ok 39 - real independent SQLite connections serialize competing payments and repeated request keys
+  ---
+  duration_ms: 1133.8631
+  type: 'test'
+  ...
+# Subtest: patients, appointments, dashboard, settings and backup still work around financial changes
+ok 40 - patients, appointments, dashboard, settings and backup still work around financial changes
+  ---
+  duration_ms: 49.364
+  type: 'test'
+  ...
+1..40
+# tests 40
+# suites 0
+# pass 40
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 5543.0435

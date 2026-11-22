@@ -1,0 +1,46 @@
+vite v4.5.14 building for production...
+transforming...
+Browserslist: browsers data (caniuse-lite) is 17 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+✓ 2921 modules transformed.
+rendering chunks...
+computing gzip size...
+../../AppData/Local/Temp/dental-financial-validated-20261118/index.html                                        4.16 kB │ gzip:   1.54 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Light-f179f7b6.woff2       26.08 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Medium-2c120e27.woff2      26.59 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Regular-0b10d34a.woff2     26.62 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Black-48e031d9.woff2       26.77 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Bold-5f3aa23d.woff2        26.87 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Light-debbf421.woff        37.24 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Medium-41191c45.woff       37.76 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Regular-b0ca194a.woff      37.89 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Black-20539000.woff        37.94 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Bold-3fa6efbe.woff         38.09 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Medium-ef153866.ttf        85.20 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Medium-fd454898.eot        85.43 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Regular-adb4c4c4.ttf       85.82 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Regular-8aa7d8e4.eot       86.04 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Bold-10be0796.ttf          86.04 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Bold-f0bf857f.eot          86.25 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Light-9aa9df42.ttf         86.26 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Light-804b8f2f.eot         86.49 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Black-7d354a77.ttf         87.46 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Black-0ba094db.eot         87.69 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Medium-77ebc911.svg       203.62 kB │ gzip:  38.63 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Bold-67f610b1.svg         205.44 kB │ gzip:  38.99 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Regular-04b178d3.svg      206.71 kB │ gzip:  38.94 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Light-e72087fd.svg        207.33 kB │ gzip:  38.17 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/itfQomraArabic-Black-481ae019.svg        210.14 kB │ gzip:  38.84 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/index-1e8ec00d.css                       280.60 kB │ gzip:  42.54 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/utils-c0940f06.js                          1.66 kB │ gzip:   0.64 kB │ map:     3.85 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/purify.es-6522bb3b.js                     62.35 kB │ gzip:  17.10 kB │ map:   110.75 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/vendor-26527280.js                       146.60 kB │ gzip:  47.03 kB │ map:   447.99 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/qr-e558d5d7.js                           209.93 kB │ gzip:  42.62 kB │ map:   451.06 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/index.es-32c5ce07.js                     216.33 kB │ gzip:  50.05 kB │ map:   538.18 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/ui-b1d81029.js                           221.81 kB │ gzip:  49.86 kB │ map:   506.22 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/pdf-9d162b44.js                          792.70 kB │ gzip: 195.62 kB │ map: 2,005.38 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/excel-5f60fa4c.js                        943.19 kB │ gzip: 257.46 kB │ map: 2,773.82 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/charts-4bf45240.js                     1,078.68 kB │ gzip: 226.16 kB │ map: 2,376.53 kB
+../../AppData/Local/Temp/dental-financial-validated-20261118/assets/index-ad7b1896.js                      3,939.19 kB │ gzip: 653.27 kB │ map: 6,927.10 kB
+✓ built in 1m 19s

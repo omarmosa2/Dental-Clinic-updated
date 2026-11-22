@@ -550,7 +550,7 @@ export default function Payments() {
                     // مدفوعات مرتبطة بعلاجات
                     const treatmentId = payment.tooth_treatment_id
                     const totalDue = validateAmount(payment.treatment_total_cost || payment.total_amount_due || 0)
-                    const paidAmount = validateAmount(payment.amount)
+                    const paidAmount = getTransactionAmount(payment)
 
                     if (!treatmentGroups.has(treatmentId)) {
                       treatmentGroups.set(treatmentId, { totalDue, totalPaid: 0 })
@@ -558,14 +558,14 @@ export default function Payments() {
 
                     const group = treatmentGroups.get(treatmentId)!
                     // جمع المبالغ المدفوعة من جميع الدفعات المكتملة والجزئية
-                    if (payment.status === 'completed' || payment.status === 'partial') {
+                    if (isRevenuePaymentStatus(payment.status)) {
                       group.totalPaid += paidAmount
                     }
                   } else if (payment.appointment_id) {
                     // مدفوعات مرتبطة بمواعيد
                     const appointmentId = payment.appointment_id
                     const totalDue = validateAmount(payment.total_amount_due || 0)
-                    const paidAmount = validateAmount(payment.amount)
+                    const paidAmount = getTransactionAmount(payment)
 
                     if (!appointmentGroups.has(appointmentId)) {
                       appointmentGroups.set(appointmentId, { totalDue, totalPaid: 0 })
@@ -573,14 +573,14 @@ export default function Payments() {
 
                     const group = appointmentGroups.get(appointmentId)!
                     // جمع المبالغ المدفوعة من جميع الدفعات المكتملة والجزئية
-                    if (payment.status === 'completed' || payment.status === 'partial') {
+                    if (isRevenuePaymentStatus(payment.status)) {
                       group.totalPaid += paidAmount
                     }
                   } else {
                     // مدفوعات عامة غير مرتبطة بمواعيد أو علاجات
                     if (payment.status === 'partial') {
                       const totalDue = validateAmount(payment.total_amount_due || payment.amount)
-                      const paid = validateAmount(payment.amount_paid || payment.amount)
+                      const paid = getTransactionAmount(payment)
                       generalRemainingBalance += Math.max(0, totalDue - paid)
                     }
                   }

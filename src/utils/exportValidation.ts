@@ -1,3 +1,4 @@
+import { sumPayments, summarizePaymentBalances, money } from '@/services/paymentCore.mjs'
 import { Payment, Appointment, InventoryItem } from '@/types'
 
 /**
@@ -10,93 +11,14 @@ export class ExportValidation {
    * التحقق من صحة حسابات المدفوعات
    */
   static validatePaymentCalculations(payments: Payment[]) {
-    const validateAmount = (amount: any): number => {
-      const num = Number(amount)
-      return isNaN(num) || !isFinite(num) ? 0 : Math.round(num * 100) / 100
-    }
-
-    // حساب الإيرادات الإجمالية (مكتملة + جزئية)
-    const totalRevenue = payments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
-      .reduce((sum, payment) => {
-        // للمدفوعات الجزئية، استخدم amount_paid إذا كان متوفراً
-        const amount = payment.status === 'partial' && payment.amount_paid !== undefined
-          ? validateAmount(payment.amount_paid)
-          : validateAmount(payment.amount)
-        return sum + amount
-      }, 0)
-
-    // المدفوعات المكتملة فقط
-    const completedAmount = payments
-      .filter(p => p.status === 'completed')
-      .reduce((sum, payment) => sum + validateAmount(payment.amount), 0)
-
-    // المدفوعات الجزئية
-    const partialAmount = payments
-      .filter(p => p.status === 'partial')
-      .reduce((sum, payment) => {
-        const amount = payment.amount_paid !== undefined
-          ? validateAmount(payment.amount_paid)
-          : validateAmount(payment.amount)
-        return sum + amount
-      }, 0)
-
-    // المدفوعات المعلقة
-    const pendingAmount = payments
-      .filter(p => p.status === 'pending')
-      .reduce((sum, payment) => {
-        const amount = validateAmount(payment.amount)
-        const totalAmountDue = validateAmount(payment.total_amount_due)
-
-        // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
-        const pendingAmount = (amount === 0 && totalAmountDue > 0) ? totalAmountDue : amount
-
-        return sum + pendingAmount
-      }, 0)
-
-    // المدفوعات المتأخرة (المدفوعات المعلقة التي تجاوز تاريخ دفعها 30 يوماً)
-    const overdueAmount = payments
-      .filter(p => {
-        if (p.status !== 'pending') return false
-
-        const paymentDate = new Date(p.payment_date)
-        const thirtyDaysAgo = new Date()
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-        return paymentDate < thirtyDaysAgo
-      })
-      .reduce((sum, payment) => {
-        const amount = validateAmount(payment.amount)
-        const totalAmountDue = validateAmount(payment.total_amount_due)
-
-        // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
-        const overdueAmount = (amount === 0 && totalAmountDue > 0) ? totalAmountDue : amount
-
-        return sum + overdueAmount
-      }, 0)
-
-    // التحقق من صحة المجموع
-    const calculatedTotal = completedAmount + partialAmount
-    const tolerance = 0.01 // تسامح للأخطاء العائمة
-
-    if (Math.abs(totalRevenue - calculatedTotal) > tolerance) {
-      console.warn('Payment calculation mismatch:', {
-        totalRevenue,
-        calculatedTotal: completedAmount + partialAmount,
-        completedAmount,
-        partialAmount,
-        difference: totalRevenue - calculatedTotal
-      })
-    }
-
-    return {
-      totalRevenue: Math.round(totalRevenue * 100) / 100,
-      completedAmount: Math.round(completedAmount * 100) / 100,
-      partialAmount: Math.round(partialAmount * 100) / 100,
-      pendingAmount: Math.round(pendingAmount * 100) / 100,
-      overdueAmount: Math.round(overdueAmount * 100) / 100,
-      isValid: Math.abs(totalRevenue - calculatedTotal) <= tolerance
-    }
+    const totalRevenue = sumPayments(payments)
+    const completedAmount = sumPayments(payments.filter(p=>p.status==='completed' || p.status==='paid'))
+    const partialAmount = sumPayments(payments.filter(p=>p.status==='partial'))
+    const pendingAmount = summarizePaymentBalances(payments).pendingBalance
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-30)
+    const overdueIds = new Set(payments.filter(p=>p.status==='pending' && new Date(p.payment_date)<cutoff).map(p=>p.tooth_treatment_id || p.appointment_id || p.id))
+    const overdueAmount = summarizePaymentBalances(payments.filter(p=>overdueIds.has(p.tooth_treatment_id || p.appointment_id || p.id))).pendingBalance
+    return {totalRevenue,completedAmount,partialAmount,pendingAmount,overdueAmount,isValid:money(completedAmount+partialAmount)===totalRevenue}
   }
 
   /**

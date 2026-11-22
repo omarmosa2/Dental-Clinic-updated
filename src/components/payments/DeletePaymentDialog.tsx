@@ -103,6 +103,7 @@ export default function DeletePaymentDialog({ open, onOpenChange, payment }: Del
         <div className="space-y-4">
           <AlertDialogDescription>
             هل أنت متأكد من رغبتك في حذف هذه الدفعة؟ لا يمكن التراجع عن هذا الإجراء.
+            {payment.is_comprehensive && payment.comprehensive_batch_id && ' سيتم حذف جميع أجزاء هذه الدفعة الشاملة المرتبطة بالعلاجات.'}
           </AlertDialogDescription>
 
           <Card>

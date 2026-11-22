@@ -1,3 +1,4 @@
+import { getRevenueTransactionAmount, isRevenuePaymentStatus } from '@/services/paymentCore.mjs'
 /**
  * Financial Reports - التقارير المالية تستخدم التقويم الميلادي فقط
  * All financial charts use ONLY Gregorian calendar system
@@ -69,10 +70,6 @@ import {
  * إنشاء تقرير مالي شامل CSV مع جميع الأمور المالية والمصروفات
  */
 async function generateComprehensiveFinancialCSV(payments: any[], timeFilter: any, expenses?: any[]): Promise<string> {
-  const validateAmount = (amount: any): number => {
-    const num = Number(amount)
-    return isNaN(num) || !isFinite(num) ? 0 : Math.round(num * 100) / 100
-  }
 
   // حساب الإحصائيات المالية الشاملة مع المصروفات
   const financialStats = ComprehensiveExportService.calculateFinancialStats(payments, [], [], [], expenses)
@@ -145,12 +142,7 @@ async function generateComprehensiveFinancialCSV(payments: any[], timeFilter: an
                         method === 'check' ? 'شيك' :
                         method === 'insurance' ? 'تأمين' : method
 
-    let amount = 0
-    if (payment.status === 'completed') {
-      amount = validateAmount(payment.amount)
-    } else if (payment.status === 'partial' && payment.amount_paid !== undefined) {
-      amount = validateAmount(payment.amount_paid)
-    }
+    const amount = getRevenueTransactionAmount(payment)
 
     if (amount > 0) {
       paymentMethods[methodArabic] = (paymentMethods[methodArabic] || 0) + amount
@@ -311,9 +303,9 @@ async function generateComprehensiveFinancialData(payments: any[], timeFilter: a
   payments.forEach(payment => {
     const method = payment.payment_method || 'unknown'
     // استخدام amount (مبلغ الدفعة الحالية) لجميع الحالات
-    const amount = validateAmount(payment.amount)
+    const amount = getRevenueTransactionAmount(payment)
 
-    if (amount > 0 && (payment.status === 'completed' || payment.status === 'partial')) {
+    if (amount > 0 && (isRevenuePaymentStatus(payment.status))) {
       paymentMethodStats[method] = (paymentMethodStats[method] || 0) + amount
     }
   })
@@ -366,7 +358,7 @@ async function generateComprehensiveFinancialData(payments: any[], timeFilter: a
       : 'جميع البيانات المالية',
     dataCount: payments.length,
     totalTransactions: payments.length,
-    successRate: payments.length > 0 ? ((payments.filter(p => p.status === 'completed' || p.status === 'partial').length) / payments.length * 100).toFixed(1) : '0.0',
+    successRate: payments.length > 0 ? ((payments.filter(p => isRevenuePaymentStatus(p.status)).length) / payments.length * 100).toFixed(1) : '0.0',
     averageTransaction: payments.length > 0 ? (financialStats.totalRevenue / payments.length).toFixed(2) : '0.00',
 
     // تفاصيل المدفوعات
@@ -794,11 +786,11 @@ export default function FinancialReports() {
 
       const calculatedStats = {}
       dataToUse
-        .filter(p => p.status === 'completed' || p.status === 'partial')
+        .filter(p => isRevenuePaymentStatus(p.status))
         .forEach(payment => {
           const method = payment.payment_method || 'cash' // Default to cash if not specified
           // استخدام amount (مبلغ الدفعة الحالية) لجميع الحالات - متسق مع باقي الحسابات
-          const amount = validateAmount(payment.amount)
+          const amount = getRevenueTransactionAmount(payment)
 
           console.log(`Payment method calculation - Payment ${payment.id}: Method=${method}, Amount=${amount}, Status=${payment.status}`)
 
@@ -817,7 +809,7 @@ export default function FinancialReports() {
           formattedAmount: formatCurrency(amount, currentCurrency),
           count: dataToUse.filter(p =>
             p.payment_method === method &&
-            (p.status === 'completed' || p.status === 'partial')
+            (isRevenuePaymentStatus(p.status))
           ).length
         }))
         .sort((a, b) => b.amount - a.amount)
@@ -856,7 +848,7 @@ export default function FinancialReports() {
       const calculatedMonthlyRevenue = {}
 
       dataToUse
-        .filter(p => p.status === 'completed' || p.status === 'partial')
+        .filter(p => isRevenuePaymentStatus(p.status))
         .forEach(payment => {
           try {
             // Try multiple date fields
@@ -868,7 +860,7 @@ export default function FinancialReports() {
 
             const month = paymentDate.toISOString().slice(0, 7) // YYYY-MM
             // استخدام amount (مبلغ الدفعة الحالية) لجميع الحالات
-            const amount = validateAmount(payment.amount)
+            const amount = getRevenueTransactionAmount(payment)
 
             console.log(`Payment ${payment.id}: Date=${payment.payment_date}, Month=${month}, Amount=${amount}, Status=${payment.status}`)
 
@@ -1150,7 +1142,7 @@ export default function FinancialReports() {
               />
             </div>
             <p className="text-xs text-muted-foreground text-right">
-              من {(paymentStats?.filteredData || []).filter(p => p.status === 'completed' || p.status === 'partial').length} معاملة
+              من {(paymentStats?.filteredData || []).filter(p => isRevenuePaymentStatus(p.status)).length} معاملة
             </p>
             {paymentStats?.trend && (
               <div className={`text-xs flex items-center justify-end mt-1 ${

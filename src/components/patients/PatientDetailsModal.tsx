@@ -96,7 +96,7 @@ export default function PatientDetailsModal({
 
   const { appointments } = useAppointmentStore()
   const { payments } = usePaymentStore()
-  const { toothTreatments, loadToothTreatmentsByPatient } = useDentalTreatmentStore()
+  const { toothTreatments } = useDentalTreatmentStore()
   const { toast } = useToast()
   const { settings } = useSettingsStore()
 
@@ -602,12 +602,14 @@ export default function PatientDetailsModal({
                   <CardContent className="card-content pt-0" dir="rtl">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
                       {/* Patient Number - Special Styling */}
-                      <div className=" f p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                      <div className="p-4 rounded-lg border border-blue-100 dark:border-blue-800">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-muted-foreground">رقم المريض</span>
-                          <Badge variant="outline" className="bg-blue-600 text-white hover:bg-blue-700 border-none">
-                            #{patient.serial_number}
-                          </Badge>
+                          {patient.patient_number != null ? (
+                            <span className="font-bold text-blue-700 dark:text-blue-400" dir="ltr">{patient.patient_number}</span>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">غير محدد</span>
+                          )}
                         </div>
                       </div>
 
@@ -1389,47 +1391,20 @@ export default function PatientDetailsModal({
                   {/* Payment Summary */}
                   {(() => {
                     // حساب الملخص المالي باستخدام الدالة مع دعم العلاجات
-                    const summary = calculatePatientPaymentSummary(patient.id, payments, appointments)
+                    const summary = calculatePatientPaymentSummary(patient.id, payments, appointments, toothTreatments)
 
-                    // تصنيف المدفوعات النشطة (المكتملة والجزئية فقط)
-                    const activePayments = patientPayments.filter(p => p.status === 'completed' || p.status === 'partial')
-                    const activeTreatmentPayments = activePayments.filter(p => p.tooth_treatment_id)
-                    const activeAppointmentPayments = activePayments.filter(p => p.appointment_id && !p.tooth_treatment_id)
-                    const activeGeneralPayments = activePayments.filter(p => !p.appointment_id && !p.tooth_treatment_id)
-
-                    // المبلغ الإجمالي المستحق: من مصادر البيانات الأصلية (العلاجات والمواعيد والمدفوعات العامة)
-                    const treatmentTotalDue = patientTreatments.reduce((sum, t) => sum + (t.cost || 0), 0)
-                    const appointmentTotalDue = patientAppointments.reduce((sum, a) => sum + (a.cost || 0), 0)
-                    const generalTotalDue = patientPayments
-                      .filter(p => !p.appointment_id && !p.tooth_treatment_id)
-                      .reduce((sum, p) => sum + (p.total_amount_due || 0), 0)
-
-                    // المبالغ المدفوعة: فقط من المدفوعات المكتملة والجزئية
-                    const treatmentTotalPaid = activeTreatmentPayments.reduce((sum, p) => sum + p.amount, 0)
-                    const appointmentTotalPaid = activeAppointmentPayments.reduce((sum, p) => sum + p.amount, 0)
-                    const generalTotalPaid = activeGeneralPayments.reduce((sum, p) => sum + p.amount, 0)
-
-                    // المبالغ المتبقية: حساب دقيق من بيانات العلاجات والمواعيد والمدفوعات العامة
-                    const treatmentRemaining = patientTreatments.reduce((total, treatment) => {
-                      const totalPaidForTreatment = patientPayments
-                        .filter(p => p.tooth_treatment_id === treatment.id && (p.status === 'completed' || p.status === 'partial'))
-                        .reduce((sum, p) => sum + p.amount, 0)
-                      return total + Math.max(0, (treatment.cost || 0) - totalPaidForTreatment)
-                    }, 0)
-                    const appointmentRemaining = patientAppointments.reduce((total, appointment) => {
-                      const totalPaidForAppointment = patientPayments
-                        .filter(p => p.appointment_id === appointment.id && !p.tooth_treatment_id && (p.status === 'completed' || p.status === 'partial'))
-                        .reduce((sum, p) => sum + p.amount, 0)
-                      return total + Math.max(0, (appointment.cost || 0) - totalPaidForAppointment)
-                    }, 0)
-                    const generalRemaining = patientPayments
-                      .filter(p => !p.appointment_id && !p.tooth_treatment_id && p.status === 'partial')
-                      .reduce((sum, p) => sum + (p.remaining_balance || 0), 0)
-
-                    // الإجماليات النهائية
-                    const totalAmountDue = treatmentTotalDue + appointmentTotalDue + generalTotalDue
-                    const totalAmountPaid = treatmentTotalPaid + appointmentTotalPaid + generalTotalPaid
-                    const totalRemainingBalance = treatmentRemaining + appointmentRemaining + generalRemaining
+                    const treatmentSummary = calculatePatientPaymentSummary(patient.id, patientPayments.filter(p=>p.tooth_treatment_id), [], patientTreatments)
+                    const appointmentSummary = calculatePatientPaymentSummary(patient.id, patientPayments.filter(p=>p.appointment_id && !p.tooth_treatment_id), patientAppointments)
+                    const generalSummary = calculatePatientPaymentSummary(patient.id, patientPayments.filter(p=>!p.appointment_id && !p.tooth_treatment_id), [])
+                    const treatmentTotalDue = treatmentSummary.totalDue
+                    const appointmentTotalDue = appointmentSummary.totalDue
+                    const generalTotalDue = generalSummary.totalDue
+                    const treatmentRemaining = treatmentSummary.totalRemaining
+                    const appointmentRemaining = appointmentSummary.totalRemaining
+                    const generalRemaining = generalSummary.totalRemaining
+                    const totalAmountDue = summary.totalDue
+                    const totalAmountPaid = summary.totalPaid
+                    const totalRemainingBalance = summary.totalRemaining
 
                     // إحصائيات إضافية
                     const pendingPayments = patientPayments.filter(p => p.status === 'pending')
@@ -1679,7 +1654,7 @@ export default function PatientDetailsModal({
                                         إجمالي المبلغ المدفوع:
                                       </div>
                                       <div className="font-medium text-green-600 dark:text-green-400">
-                                        {formatCurrency(payment.total_amount || payment.amount)}
+                                        {formatCurrency(payment.total_amount ?? payment.amount)}
                                       </div>
 
                                       {/* مبلغ الخصم */}

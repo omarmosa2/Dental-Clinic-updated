@@ -1,3 +1,4 @@
+const { getRevenueTransactionAmount, isRevenuePaymentStatus, sumPayments, summarizePaymentBalances, money } = require('./paymentCore.mjs')
 class ReportsService {
 
   // Helper function to get Arabic treatment name
@@ -413,17 +414,11 @@ class ReportsService {
     }
 
     // Basic financial stats - include both completed and partial payments
-    const totalRevenue = filteredPayments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
-      .reduce((sum, p) => sum + validateAmount(p.amount), 0)
+    const totalRevenue = sumPayments(filteredPayments)
 
-    const totalPaid = filteredPayments
-      .filter(p => p.status === 'completed' || p.status === 'partial')
-      .reduce((sum, p) => sum + validateAmount(p.amount), 0)
+    const totalPaid = sumPayments(filteredPayments)
 
-    const totalPending = filteredPayments
-      .filter(p => p.status === 'pending')
-      .reduce((sum, p) => sum + validateAmount(p.remaining_balance || p.amount), 0)
+    const totalPending = summarizePaymentBalances(filteredPayments).pendingBalance
 
     const totalOverdue = filteredPayments
       .filter(p => p.status === 'overdue')
@@ -445,10 +440,10 @@ class ReportsService {
     }
 
     filteredPayments
-      .filter(p => p.status === 'completed')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .forEach(payment => {
         const method = paymentMethodNames[payment.payment_method] || payment.payment_method
-        paymentMethodCounts[method] = (paymentMethodCounts[method] || 0) + payment.amount
+        paymentMethodCounts[method] = money((paymentMethodCounts[method] || 0) + getRevenueTransactionAmount(payment))
       })
 
     const revenueByPaymentMethod = Object.entries(paymentMethodCounts)
@@ -463,7 +458,7 @@ class ReportsService {
     const treatmentRevenue = {}
 
     filteredPayments
-      .filter(p => p.status === 'completed' && p.appointment?.treatment_id)
+      .filter(p => isRevenuePaymentStatus(p.status) && p.appointment?.treatment_id)
       .forEach(payment => {
         const treatment = treatments.find(t => t.id === payment.appointment?.treatment_id)
         const treatmentName = treatment?.name || 'غير محدد'
@@ -472,7 +467,7 @@ class ReportsService {
           treatmentRevenue[treatmentName] = { amount: 0, count: 0 }
         }
 
-        treatmentRevenue[treatmentName].amount += payment.amount
+        treatmentRevenue[treatmentName].amount = money(treatmentRevenue[treatmentName].amount + getRevenueTransactionAmount(payment))
         treatmentRevenue[treatmentName].count += 1
       })
 
@@ -487,12 +482,12 @@ class ReportsService {
 
     // Revenue trend
     const revenueTrend = this.groupByPeriod(
-      filteredPayments.filter(p => p.status === 'completed'),
+      filteredPayments.filter(p => isRevenuePaymentStatus(p.status)),
       'month',
       'payment_date'
     ).map(group => ({
       period: group.period,
-      amount: group.data.reduce((sum, p) => sum + p.amount, 0)
+      amount: sumPayments(group.data)
     }))
 
     // Calculate expenses by type
@@ -532,13 +527,13 @@ class ReportsService {
 
     // Outstanding payments
     const outstandingPayments = payments
-      .filter(p => ['pending', 'overdue', 'partial'].includes(p.status))
+      .filter(p => ['pending', 'overdue', 'partial'].includes(p.status) && (p.remaining_balance ?? p.treatment_remaining_balance ?? p.appointment_remaining_balance ?? 0) > 0)
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
       .slice(0, 20) // Top 20 outstanding payments
 
     // Recent transactions
     const recentTransactions = filteredPayments
-      .filter(p => p.status === 'completed')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
       .slice(0, 10) // Last 10 transactions
 

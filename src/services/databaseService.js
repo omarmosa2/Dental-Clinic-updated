@@ -1,3 +1,5 @@
+const { sumPayments } = require('./paymentCore.mjs')
+const { PaymentRepository } = require('./paymentRepository.cjs')
 const Database = require('better-sqlite3')
 const { join } = require('path')
 const { readFileSync } = require('fs')
@@ -1612,7 +1614,7 @@ class DatabaseService {
 
     // Transform the data to include patient, appointment, and treatment objects
     return payments.map(payment => ({
-      ...payment,
+      ...this.projectPayment(payment),
       patient: payment.patient_id ? {
         id: payment.patient_id,
         full_name: payment.patient_full_name,
@@ -1721,7 +1723,7 @@ class DatabaseService {
 
     // Transform the data to include patient, appointment, and treatment objects
     return payments.map(payment => ({
-      ...payment,
+      ...this.projectPayment(payment),
       patient: payment.patient_id ? {
         id: payment.patient_id,
         full_name: payment.patient_full_name,
@@ -1748,325 +1750,17 @@ class DatabaseService {
     }))
   }
 
-  validatePaymentAmounts(amount, discountAmount = 0, taxAmount = 0) {
-    if (amount < 0) {
-      throw new Error('Payment amount cannot be negative')
-    }
-    if (discountAmount < 0) {
-      throw new Error('Discount amount cannot be negative')
-    }
-    if (taxAmount < 0) {
-      throw new Error('Tax amount cannot be negative')
-    }
-    if (discountAmount > amount + taxAmount) {
-      throw new Error('Discount cannot be greater than amount plus tax')
-    }
-  }
+  validatePaymentAmounts(amount, discountAmount = 0, taxAmount = 0) { return PaymentRepository.prototype.validatePaymentAmounts.apply(this, [amount, discountAmount, taxAmount]) }
 
-  getPaymentStatusFromBalance(totalCost, totalPaid) {
-    if (totalPaid <= 0) return 'pending'
-    return totalPaid >= totalCost ? 'completed' : 'partial'
-  }
+  getPaymentStatusFromBalance(totalCost, totalPaid) { return PaymentRepository.prototype.getPaymentStatusFromBalance.apply(this, [totalCost, totalPaid]) }
 
-  getLinkedPaymentTotal(linkColumn, linkId, excludePaymentId = null) {
-    const allowedColumns = new Set(['appointment_id', 'tooth_treatment_id'])
-    if (!allowedColumns.has(linkColumn)) {
-      throw new Error('Invalid payment link column')
-    }
+  getLinkedPaymentTotal(linkColumn, linkId, excludePaymentId = null) { return PaymentRepository.prototype.getLinkedPaymentTotal.apply(this, [linkColumn, linkId, excludePaymentId]) }
 
-    const excludeClause = excludePaymentId ? 'AND id != ?' : ''
-    const params = excludePaymentId ? [linkId, excludePaymentId] : [linkId]
-    const result = this.db.prepare(`
-      SELECT COALESCE(SUM(amount), 0) as total
-      FROM payments
-      WHERE ${linkColumn} = ?
-        AND COALESCE(status, 'completed') IN ('completed', 'partial', 'pending')
-        ${excludeClause}
-    `).get(...params)
+  async createPayment(payment) { return PaymentRepository.prototype.createPayment.apply(this, [payment]) }
 
-    return result?.total || 0
-  }
+  async updatePayment(id, updates) { return PaymentRepository.prototype.updatePayment.apply(this, [id, updates]) }
 
-  async createPayment(payment) {
-    console.log('🚀 DatabaseService.js createPayment called with:', payment)
-    this.ensurePaymentsColumns()
-    const id = uuidv4()
-    const now = new Date().toISOString()
-
-    const transaction = this.db.transaction(() => {
-      const amount = payment.amount || 0
-      const discountAmount = payment.discount_amount || 0
-      const taxAmount = payment.tax_amount || 0
-      this.validatePaymentAmounts(amount, discountAmount, taxAmount)
-
-      const totalAmount = amount + taxAmount - discountAmount
-      let appointmentTotalCost = null
-      let appointmentTotalPaid = null
-      let appointmentRemainingBalance = null
-      let treatmentTotalCost = null
-      let treatmentTotalPaid = null
-      let treatmentRemainingBalance = null
-      let totalAmountDue = payment.total_amount_due || totalAmount
-      let amountPaid = payment.amount_paid || amount
-      let remainingBalance = Math.max(0, totalAmountDue - amountPaid)
-      let status = payment.status || 'completed'
-
-      if (payment.tooth_treatment_id) {
-        const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(payment.tooth_treatment_id)
-        treatmentTotalCost = treatment?.cost || payment.treatment_total_cost || totalAmount
-        const alreadyPaid = this.getLinkedPaymentTotal('tooth_treatment_id', payment.tooth_treatment_id)
-        const remainingBeforePayment = Math.max(0, treatmentTotalCost - alreadyPaid)
-        if (amount > remainingBeforePayment) {
-          throw new Error(`Payment amount exceeds remaining treatment balance (${remainingBeforePayment})`)
-        }
-        treatmentTotalPaid = alreadyPaid + amount
-        treatmentRemainingBalance = Math.max(0, treatmentTotalCost - treatmentTotalPaid)
-        totalAmountDue = treatmentTotalCost
-        amountPaid = treatmentTotalPaid
-        remainingBalance = treatmentRemainingBalance
-        status = this.getPaymentStatusFromBalance(treatmentTotalCost, treatmentTotalPaid)
-      } else if (payment.appointment_id) {
-        const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(payment.appointment_id)
-        appointmentTotalCost = appointment?.cost || payment.appointment_total_cost || totalAmount
-        const alreadyPaid = this.getLinkedPaymentTotal('appointment_id', payment.appointment_id)
-        const remainingBeforePayment = Math.max(0, appointmentTotalCost - alreadyPaid)
-        if (amount > remainingBeforePayment) {
-          throw new Error(`Payment amount exceeds remaining appointment balance (${remainingBeforePayment})`)
-        }
-        appointmentTotalPaid = alreadyPaid + amount
-        appointmentRemainingBalance = Math.max(0, appointmentTotalCost - appointmentTotalPaid)
-        totalAmountDue = appointmentTotalCost
-        amountPaid = appointmentTotalPaid
-        remainingBalance = appointmentRemainingBalance
-        status = this.getPaymentStatusFromBalance(appointmentTotalCost, appointmentTotalPaid)
-      } else {
-        if (amountPaid > totalAmountDue) {
-          throw new Error(`Paid amount exceeds total amount due (${totalAmountDue})`)
-        }
-        status = this.getPaymentStatusFromBalance(totalAmountDue, amountPaid)
-      }
-
-      const stmt = this.db.prepare(`
-        INSERT INTO payments (
-          id, patient_id, tooth_treatment_id, appointment_id, amount, payment_method, payment_date,
-          description, receipt_number, status, notes, discount_amount, tax_amount,
-          total_amount, appointment_total_cost, appointment_total_paid, appointment_remaining_balance,
-          treatment_total_cost, treatment_total_paid, treatment_remaining_balance,
-          total_amount_due, amount_paid, remaining_balance, is_comprehensive, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-
-      stmt.run(
-        id, payment.patient_id, payment.tooth_treatment_id, payment.appointment_id, amount,
-        payment.payment_method, payment.payment_date, payment.description,
-        payment.receipt_number, status, payment.notes,
-        discountAmount, taxAmount, totalAmount,
-        appointmentTotalCost, appointmentTotalPaid, appointmentRemainingBalance,
-        treatmentTotalCost, treatmentTotalPaid, treatmentRemainingBalance,
-        totalAmountDue, amountPaid, remainingBalance,
-        payment.is_comprehensive ? 1 : 0,
-        now, now
-      )
-
-      if (payment.appointment_id) {
-        this.updateAppointmentPaymentCalculationsSync(payment.appointment_id, appointmentTotalCost || totalAmountDue)
-      }
-      if (payment.tooth_treatment_id) {
-        this.updateToothTreatmentPaymentCalculationsSync(payment.tooth_treatment_id, treatmentTotalCost || totalAmountDue)
-      }
-
-      return this.db.prepare('SELECT * FROM payments WHERE id = ?').get(id)
-    })
-
-    const createdPayment = transaction()
-    this.db.pragma('wal_checkpoint(TRUNCATE)')
-    return createdPayment
-  }
-
-  async updatePayment(id, updates) {
-    this.ensurePaymentsColumns()
-    const now = new Date().toISOString()
-
-    const transaction = this.db.transaction(() => {
-      // Get current payment to calculate new values
-      const currentPayment = this.db.prepare('SELECT * FROM payments WHERE id = ?').get(id)
-      if (!currentPayment) {
-        throw new Error('Payment not found')
-      }
-
-      // حساب القيم الجديدة
-      const amount = updates.amount !== undefined ? updates.amount : currentPayment.amount
-      const discountAmount = updates.discount_amount !== undefined ? updates.discount_amount : (currentPayment.discount_amount || 0)
-      const taxAmount = updates.tax_amount !== undefined ? updates.tax_amount : (currentPayment.tax_amount || 0)
-      this.validatePaymentAmounts(amount, discountAmount, taxAmount)
-      const totalAmount = amount + taxAmount - discountAmount
-
-      const previousAppointmentId = currentPayment.appointment_id
-      const nextAppointmentId = updates.appointment_id !== undefined ? updates.appointment_id : currentPayment.appointment_id
-      const previousTreatmentId = currentPayment.tooth_treatment_id
-      const nextTreatmentId = updates.tooth_treatment_id !== undefined ? updates.tooth_treatment_id : currentPayment.tooth_treatment_id
-
-      let treatmentTotalCost = null
-      let treatmentTotalPaid = null
-      let treatmentRemainingBalance = null
-      let appointmentTotalCost = null
-      let appointmentTotalPaid = null
-      let appointmentRemainingBalance = null
-      let totalAmountDue = updates.total_amount_due !== undefined ? updates.total_amount_due : (currentPayment.total_amount_due || totalAmount)
-      let amountPaid = updates.amount_paid !== undefined ? updates.amount_paid : (currentPayment.amount_paid || amount)
-      let remainingBalance = Math.max(0, totalAmountDue - amountPaid)
-      let status = updates.status || currentPayment.status || 'completed'
-
-      if (nextTreatmentId) {
-        const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(nextTreatmentId)
-        treatmentTotalCost = treatment?.cost || currentPayment.treatment_total_cost || totalAmount
-        const alreadyPaid = this.getLinkedPaymentTotal('tooth_treatment_id', nextTreatmentId, id)
-        const remainingBeforePayment = Math.max(0, treatmentTotalCost - alreadyPaid)
-        if (amount > remainingBeforePayment) {
-          throw new Error(`Payment amount exceeds remaining treatment balance (${remainingBeforePayment})`)
-        }
-
-        treatmentTotalPaid = alreadyPaid + amount
-        treatmentRemainingBalance = Math.max(0, treatmentTotalCost - treatmentTotalPaid)
-        totalAmountDue = treatmentTotalCost
-        amountPaid = treatmentTotalPaid
-        remainingBalance = treatmentRemainingBalance
-        status = this.getPaymentStatusFromBalance(treatmentTotalCost, treatmentTotalPaid)
-      } else if (nextAppointmentId) {
-        const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(nextAppointmentId)
-        appointmentTotalCost = appointment?.cost || currentPayment.appointment_total_cost || totalAmount
-        const alreadyPaid = this.getLinkedPaymentTotal('appointment_id', nextAppointmentId, id)
-        const remainingBeforePayment = Math.max(0, appointmentTotalCost - alreadyPaid)
-        if (amount > remainingBeforePayment) {
-          throw new Error(`Payment amount exceeds remaining appointment balance (${remainingBeforePayment})`)
-        }
-
-        appointmentTotalPaid = alreadyPaid + amount
-        appointmentRemainingBalance = Math.max(0, appointmentTotalCost - appointmentTotalPaid)
-        totalAmountDue = appointmentTotalCost
-        amountPaid = appointmentTotalPaid
-        remainingBalance = appointmentRemainingBalance
-        status = this.getPaymentStatusFromBalance(appointmentTotalCost, appointmentTotalPaid)
-      } else {
-        if (amountPaid > totalAmountDue) {
-          throw new Error(`Paid amount exceeds total amount due (${totalAmountDue})`)
-        }
-        status = this.getPaymentStatusFromBalance(totalAmountDue, amountPaid)
-      }
-
-      const stmt = this.db.prepare(`
-        UPDATE payments SET
-          tooth_treatment_id = COALESCE(?, tooth_treatment_id),
-          appointment_id = COALESCE(?, appointment_id),
-          amount = ?,
-          payment_method = COALESCE(?, payment_method),
-          payment_date = COALESCE(?, payment_date),
-          description = COALESCE(?, description),
-          receipt_number = COALESCE(?, receipt_number),
-          status = ?,
-          notes = COALESCE(?, notes),
-          discount_amount = ?,
-          tax_amount = ?,
-          total_amount = ?,
-          appointment_total_cost = ?,
-          appointment_total_paid = ?,
-          appointment_remaining_balance = ?,
-          treatment_total_cost = ?,
-          treatment_total_paid = ?,
-          treatment_remaining_balance = ?,
-          total_amount_due = ?,
-          amount_paid = ?,
-          remaining_balance = ?,
-          updated_at = ?
-        WHERE id = ?
-      `)
-
-      stmt.run(
-        updates.tooth_treatment_id, updates.appointment_id, amount,
-        updates.payment_method, updates.payment_date, updates.description,
-        updates.receipt_number, status, updates.notes,
-        discountAmount, taxAmount, totalAmount,
-        appointmentTotalCost, appointmentTotalPaid, appointmentRemainingBalance,
-        treatmentTotalCost, treatmentTotalPaid, treatmentRemainingBalance,
-        totalAmountDue, amountPaid, remainingBalance, now, id
-      )
-
-      if (previousAppointmentId) {
-        const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(previousAppointmentId)
-        this.updateAppointmentPaymentCalculationsSync(previousAppointmentId, appointment?.cost || 0)
-      }
-      if (nextAppointmentId && nextAppointmentId !== previousAppointmentId) {
-        const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(nextAppointmentId)
-        this.updateAppointmentPaymentCalculationsSync(nextAppointmentId, appointment?.cost || appointmentTotalCost || 0)
-      }
-      if (previousTreatmentId) {
-        const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(previousTreatmentId)
-        this.updateToothTreatmentPaymentCalculationsSync(previousTreatmentId, treatment?.cost || 0)
-      }
-      if (nextTreatmentId && nextTreatmentId !== previousTreatmentId) {
-        const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(nextTreatmentId)
-        this.updateToothTreatmentPaymentCalculationsSync(nextTreatmentId, treatment?.cost || treatmentTotalCost || 0)
-      }
-
-      return this.db.prepare('SELECT * FROM payments WHERE id = ?').get(id)
-    })
-
-    const updatedPayment = transaction()
-    this.db.pragma('wal_checkpoint(TRUNCATE)')
-    return updatedPayment
-  }
-
-  async deletePayment(id) {
-    this.ensurePaymentsColumns()
-    const transaction = this.db.transaction(() => {
-      const existing = this.db.prepare(`
-        SELECT appointment_id, tooth_treatment_id, total_amount_due, treatment_total_cost, is_comprehensive, comprehensive_batch_id
-        FROM payments
-        WHERE id = ?
-      `).get(id)
-      if (!existing) {
-        return false
-      }
-
-      const touchedTreatmentIds = new Set()
-      let result
-      if (existing.is_comprehensive && existing.comprehensive_batch_id) {
-        const batchPayments = this.db.prepare(`
-          SELECT tooth_treatment_id
-          FROM payments
-          WHERE comprehensive_batch_id = ?
-        `).all(existing.comprehensive_batch_id)
-        batchPayments.forEach(payment => {
-          if (payment.tooth_treatment_id) touchedTreatmentIds.add(payment.tooth_treatment_id)
-        })
-        result = this.db.prepare('DELETE FROM payments WHERE comprehensive_batch_id = ?').run(existing.comprehensive_batch_id)
-      } else {
-        result = this.db.prepare('DELETE FROM payments WHERE id = ?').run(id)
-        if (existing.tooth_treatment_id) touchedTreatmentIds.add(existing.tooth_treatment_id)
-      }
-
-      if (result.changes > 0 && existing?.appointment_id) {
-        const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(existing.appointment_id)
-        this.updateAppointmentPaymentCalculationsSync(existing.appointment_id, appointment?.cost || existing.total_amount_due || 0)
-      }
-
-      if (result.changes > 0) {
-        touchedTreatmentIds.forEach(treatmentId => {
-          const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(treatmentId)
-          this.updateToothTreatmentPaymentCalculationsSync(
-            treatmentId,
-            treatment?.cost || existing.treatment_total_cost || existing.total_amount_due || 0
-          )
-        })
-      }
-
-      return result.changes > 0
-    })
-
-    const deleted = transaction()
-    this.db.pragma('wal_checkpoint(TRUNCATE)')
-    return deleted
-  }
+  async deletePayment(id) { return PaymentRepository.prototype.deletePayment.apply(this, [id]) }
 
   // دالة لحذف المدفوعات حسب معرف العلاج
   async deletePaymentsByToothTreatment(toothTreatmentId) {
@@ -2093,164 +1787,26 @@ class DatabaseService {
       WHERE p.tooth_treatment_id = ?
       ORDER BY p.payment_date DESC
     `)
-    return stmt.all(toothTreatmentId)
+    return stmt.all(toothTreatmentId).map(payment => this.projectPayment(payment))
   }
 
-  updateAppointmentPaymentCalculationsSync(appointmentId, appointmentCost) {
-    const appointment = this.db.prepare('SELECT cost FROM appointments WHERE id = ?').get(appointmentId)
-    const effectiveAppointmentCost = appointmentCost || appointment?.cost || 0
+  updateAppointmentPaymentCalculationsSync(appointmentId, appointmentCost) { return PaymentRepository.prototype.updateAppointmentPaymentCalculationsSync.apply(this, [appointmentId, appointmentCost]) }
 
-    const payments = this.db.prepare(`
-      SELECT *
-      FROM payments
-      WHERE appointment_id = ?
-      ORDER BY payment_date ASC, created_at ASC
-    `).all(appointmentId)
+  async recalculateAppointmentPayments(appointmentId) { this.getLinkedPaymentTotal('appointment_id', appointmentId) }
 
-    if (payments.length === 0) {
-      return
-    }
-
-    let runningTotal = 0
-    const updateStmt = this.db.prepare(`
-      UPDATE payments SET
-        appointment_total_cost = ?,
-        appointment_total_paid = ?,
-        appointment_remaining_balance = ?,
-        total_amount_due = ?,
-        amount_paid = ?,
-        remaining_balance = ?,
-        status = ?,
-        updated_at = ?
-      WHERE id = ?
-    `)
-
-    payments.forEach(payment => {
-      runningTotal += payment.amount || 0
-      const remainingBalance = Math.max(0, effectiveAppointmentCost - runningTotal)
-      const status = this.getPaymentStatusFromBalance(effectiveAppointmentCost, runningTotal)
-
-      updateStmt.run(
-        effectiveAppointmentCost,
-        runningTotal,
-        remainingBalance,
-        effectiveAppointmentCost,
-        runningTotal,
-        remainingBalance,
-        status,
-        new Date().toISOString(),
-        payment.id
-      )
-    })
-  }
-
-  async recalculateAppointmentPayments(appointmentId) {
-    const transaction = this.db.transaction(() => {
-      this.updateAppointmentPaymentCalculationsSync(appointmentId)
-    })
-    transaction()
-    this.db.pragma('wal_checkpoint(TRUNCATE)')
-  }
-
-  async recalculateToothTreatmentPayments(toothTreatmentId) {
-    const transaction = this.db.transaction(() => {
-      this.updateToothTreatmentPaymentCalculationsSync(toothTreatmentId)
-    })
-    transaction()
-    this.db.pragma('wal_checkpoint(TRUNCATE)')
-  }
+  async recalculateToothTreatmentPayments(toothTreatmentId) { this.getLinkedPaymentTotal('tooth_treatment_id', toothTreatmentId) }
 
   // دالة للحصول على ملخص المدفوعات لعلاج محدد
-  updateToothTreatmentPaymentCalculationsSync(toothTreatmentId, treatmentCost) {
-    const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(toothTreatmentId)
-    const effectiveTreatmentCost = treatmentCost || treatment?.cost || 0
+  updateToothTreatmentPaymentCalculationsSync(toothTreatmentId, treatmentCost) { return PaymentRepository.prototype.updateToothTreatmentPaymentCalculationsSync.apply(this, [toothTreatmentId, treatmentCost]) }
 
-    const payments = this.db.prepare(`
-      SELECT *
-      FROM payments
-      WHERE tooth_treatment_id = ?
-      ORDER BY payment_date ASC, created_at ASC
-    `).all(toothTreatmentId)
-
-    if (payments.length === 0) {
-      return
-    }
-
-    let runningTotal = 0
-    const updateStmt = this.db.prepare(`
-      UPDATE payments SET
-        treatment_total_cost = ?,
-        treatment_total_paid = ?,
-        treatment_remaining_balance = ?,
-        total_amount_due = ?,
-        amount_paid = ?,
-        remaining_balance = ?,
-        status = ?,
-        updated_at = ?
-      WHERE id = ?
-    `)
-
-    payments.forEach(payment => {
-      runningTotal += payment.amount || 0
-      const remainingBalance = Math.max(0, effectiveTreatmentCost - runningTotal)
-      let status = 'pending'
-      if (remainingBalance <= 0 && effectiveTreatmentCost > 0) {
-        status = 'completed'
-      } else if (runningTotal > 0) {
-        status = 'partial'
-      }
-
-      updateStmt.run(
-        effectiveTreatmentCost,
-        runningTotal,
-        remainingBalance,
-        effectiveTreatmentCost,
-        runningTotal,
-        remainingBalance,
-        status,
-        new Date().toISOString(),
-        payment.id
-      )
-    })
-  }
-
-  async getToothTreatmentPaymentSummary(toothTreatmentId) {
-    // احصل على تكلفة العلاج
-    const treatment = this.db.prepare('SELECT cost FROM tooth_treatments WHERE id = ?').get(toothTreatmentId)
-    const treatmentCost = treatment?.cost || 0
-
-    // احصل على جميع المدفوعات المرتبطة بهذا العلاج
-    const payments = this.db.prepare(`
-      SELECT * FROM payments WHERE tooth_treatment_id = ? ORDER BY created_at ASC
-    `).all(toothTreatmentId)
-
-    const totalPaid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
-    const remainingBalance = Math.max(0, treatmentCost - totalPaid)
-    const paymentCount = payments.length
-
-    let status = 'pending'
-    if (remainingBalance <= 0) {
-      status = 'completed'
-    } else if (totalPaid > 0) {
-      status = 'partial'
-    }
-
-    return {
-      treatmentCost,
-      totalPaid,
-      remainingBalance,
-      paymentCount,
-      status,
-      payments
-    }
-  }
+  async getToothTreatmentPaymentSummary(toothTreatmentId) { return PaymentRepository.prototype.getToothTreatmentPaymentSummary.apply(this, [toothTreatmentId]) }
 
   async getUnpaidPatients() {
     const stmt = this.db.prepare(`
       WITH treatment_paid AS (
         SELECT
           tooth_treatment_id,
-          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+          SUM(CASE WHEN status IN ('completed', 'partial', 'paid') THEN ROUND(COALESCE(total_amount, amount, 0) * 100) ELSE 0 END) / 100.0 as total_paid
         FROM payments
         WHERE tooth_treatment_id IS NOT NULL
         GROUP BY tooth_treatment_id
@@ -2258,9 +1814,9 @@ class DatabaseService {
       appointment_paid AS (
         SELECT
           appointment_id,
-          SUM(CASE WHEN status IN ('completed', 'partial') THEN COALESCE(amount, 0) ELSE 0 END) as total_paid
+          SUM(CASE WHEN status IN ('completed', 'partial', 'paid') THEN ROUND(COALESCE(total_amount, amount, 0) * 100) ELSE 0 END) / 100.0 as total_paid
         FROM payments
-        WHERE appointment_id IS NOT NULL
+        WHERE appointment_id IS NOT NULL AND tooth_treatment_id IS NULL
         GROUP BY appointment_id
       )
       SELECT
@@ -2309,45 +1865,7 @@ class DatabaseService {
     return stmt.all()
   }
 
-  async getRemainingBalancePatients() {
-    const stmt = this.db.prepare(`
-      SELECT
-        p.id as patient_id,
-        p.full_name as patient_name,
-        COALESCE(ip.id, pm.id) as reference_id,
-        COALESCE(tt.treatment_type, a.title, 'دفعة متبقية') as treatment_name,
-        COALESCE(pm.total_amount_due, pm.amount, 0) as total_amount,
-        COALESCE(pm.amount_paid, pm.amount, 0) as amount_paid,
-        COALESCE(
-          pm.remaining_balance,
-          COALESCE(pm.total_amount_due, pm.amount, 0) - COALESCE(pm.amount_paid, pm.amount, 0),
-          0
-        ) as remaining_balance,
-        COALESCE(ip.status, pm.status, 'partial') as status,
-        ip.due_date as next_due_date,
-        pm.payment_method as payment_method,
-        CASE
-          WHEN ip.id IS NOT NULL THEN 'installment'
-          ELSE 'payment'
-        END as source_type
-      FROM payments pm
-      INNER JOIN patients p ON p.id = pm.patient_id
-      LEFT JOIN installment_payments ip
-        ON ip.payment_id = pm.id
-        AND ip.status != 'paid'
-      LEFT JOIN tooth_treatments tt ON tt.id = pm.tooth_treatment_id
-      LEFT JOIN appointments a ON a.id = pm.appointment_id
-      WHERE COALESCE(
-              pm.remaining_balance,
-              COALESCE(pm.total_amount_due, pm.amount, 0) - COALESCE(pm.amount_paid, pm.amount, 0),
-              0
-            ) > 0
-         OR ip.id IS NOT NULL
-      ORDER BY remaining_balance DESC, p.full_name ASC
-    `)
-
-    return stmt.all()
-  }
+  async getRemainingBalancePatients() { return PaymentRepository.prototype.getRemainingBalancePatients.apply(this, []) }
 
   async searchPayments(query) {
     this.ensureConnection()
@@ -2411,7 +1929,7 @@ class DatabaseService {
 
     // Transform the data to include patient, appointment, and treatment objects
     return payments.map(payment => ({
-      ...payment,
+      ...this.projectPayment(payment),
       patient: payment.patient_id ? {
         id: payment.patient_id,
         full_name: payment.patient_full_name,
@@ -2726,7 +2244,7 @@ class DatabaseService {
 
     const totalPatients = this.db.prepare('SELECT COUNT(*) as count FROM patients').get().count
     const totalAppointments = this.db.prepare('SELECT COUNT(*) as count FROM appointments').get().count
-    const totalRevenue = this.db.prepare('SELECT SUM(total_amount) as total FROM payments WHERE status = ?').get('completed').total || 0
+    const totalRevenue = sumPayments(this.db.prepare('SELECT * FROM payments').all())
     const pendingPayments = this.db.prepare('SELECT SUM(total_amount) as total FROM payments WHERE status = ?').get('pending').total || 0
 
     // Today's appointments
@@ -2735,7 +2253,7 @@ class DatabaseService {
 
     // This month's revenue
     const thisMonth = new Date().toISOString().slice(0, 7) // YYYY-MM
-    const thisMonthRevenue = this.db.prepare('SELECT SUM(total_amount) as total FROM payments WHERE status = ? AND payment_date LIKE ?').get('completed', `${thisMonth}%`).total || 0
+    const thisMonthRevenue = sumPayments(this.db.prepare('SELECT * FROM payments WHERE payment_date LIKE ?').all(`${thisMonth}%`))
 
     // Low stock items
     const lowStockItems = this.db.prepare('SELECT COUNT(*) as count FROM inventory WHERE quantity <= minimum_stock').get().count
@@ -5470,94 +4988,9 @@ class DatabaseService {
     return stmt.all(appointmentId)
   }
 
-  async createToothTreatment(treatment) {
-    this.ensureConnection()
-    this.ensureToothTreatmentsTableExists()
+  async createToothTreatment(treatment) { return PaymentRepository.prototype.createToothTreatment.apply(this, [treatment]) }
 
-    const { v4: uuidv4 } = require('uuid')
-    const id = uuidv4()
-    const now = new Date().toISOString()
-    const toothNumbers = Array.isArray(treatment.tooth_numbers)
-      ? treatment.tooth_numbers.map(Number).filter(Number.isFinite)
-      : typeof treatment.tooth_numbers === 'string' && treatment.tooth_numbers.trim()
-        ? treatment.tooth_numbers.split(',').map(value => Number(value.trim())).filter(Number.isFinite)
-        : [Number(treatment.tooth_number)]
-    const normalizedToothNumbers = Array.from(new Set(toothNumbers.length > 0 ? toothNumbers : [Number(treatment.tooth_number)]))
-      .sort((a, b) => a - b)
-    const toothNumbersValue = normalizedToothNumbers.join(',')
-    const isMultiTooth = normalizedToothNumbers.length > 1 ? 1 : 0
-
-    // Auto-assign priority if not provided
-    if (!treatment.priority) {
-      const maxPriorityStmt = this.db.prepare(`
-        SELECT COALESCE(MAX(priority), 0) + 1 as next_priority
-        FROM tooth_treatments
-        WHERE patient_id = ? AND tooth_number = ?
-      `)
-      const result = maxPriorityStmt.get(treatment.patient_id, treatment.tooth_number)
-      treatment.priority = result.next_priority
-    }
-
-    const stmt = this.db.prepare(`
-      INSERT INTO tooth_treatments (
-        id, patient_id, tooth_number, tooth_numbers, is_multi_tooth, tooth_name, treatment_type, treatment_category,
-        treatment_status, treatment_color, start_date, completion_date, cost,
-        priority, notes, appointment_id, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `)
-
-    stmt.run(
-      id, treatment.patient_id, treatment.tooth_number, toothNumbersValue, isMultiTooth, treatment.tooth_name,
-      treatment.treatment_type, treatment.treatment_category, treatment.treatment_status,
-      treatment.treatment_color, treatment.start_date, treatment.completion_date,
-      treatment.cost, treatment.priority, treatment.notes, treatment.appointment_id,
-      now, now
-    )
-
-    return { ...treatment, tooth_numbers: toothNumbersValue, is_multi_tooth: isMultiTooth, id, created_at: now, updated_at: now }
-  }
-
-  async updateToothTreatment(id, updates) {
-    this.ensureConnection()
-    this.ensureToothTreatmentsTableExists()
-
-    const now = new Date().toISOString()
-
-    const allowedColumns = [
-      'patient_id', 'tooth_number', 'tooth_numbers', 'is_multi_tooth', 'tooth_name', 'treatment_type', 'treatment_category',
-      'treatment_status', 'treatment_color', 'start_date', 'completion_date',
-      'cost', 'priority', 'notes', 'appointment_id'
-    ]
-
-    const updateColumns = Object.keys(updates).filter(key => allowedColumns.includes(key))
-
-    if (updateColumns.length === 0) {
-      throw new Error('No valid columns to update')
-    }
-
-    const setClause = updateColumns.map(col => `${col} = ?`).join(', ')
-    const values = updateColumns.map(col => {
-      if (col === 'tooth_numbers' && Array.isArray(updates[col])) {
-        return Array.from(new Set(updates[col].map(Number).filter(Number.isFinite))).sort((a, b) => a - b).join(',')
-      }
-      if (col === 'is_multi_tooth') {
-        return updates[col] ? 1 : 0
-      }
-      return updates[col]
-    })
-
-    const stmt = this.db.prepare(`
-      UPDATE tooth_treatments
-      SET ${setClause}, updated_at = ?
-      WHERE id = ?
-    `)
-
-    stmt.run(...values, now, id)
-
-    if (updates.cost !== undefined) {
-      this.updateToothTreatmentPaymentCalculationsSync(id, updates.cost)
-    }
-  }
+  async updateToothTreatment(id, updates) { return PaymentRepository.prototype.updateToothTreatment.apply(this, [id,updates]) }
 
   async deleteToothTreatment(id) {
     this.ensureConnection()
@@ -5591,67 +5024,18 @@ class DatabaseService {
   }
 
   async reorderToothTreatments(patientId, toothNumber, treatmentIds) {
-    this.ensureConnection()
-    this.ensureToothTreatmentsTableExists()
-
-    if (!treatmentIds || treatmentIds.length === 0) {
-      return
-    }
-
-    const transaction = this.db.transaction(() => {
+    if (!treatmentIds?.length) return
+    this.db.transaction(() => {
+      if (new Set(treatmentIds).size !== treatmentIds.length) throw new Error('Duplicate treatment IDs')
+      const current = this.db.prepare('SELECT id, priority FROM tooth_treatments WHERE patient_id = ? AND tooth_number = ? ORDER BY priority, id').all(patientId,toothNumber)
+      if (treatmentIds.some((id)=>!current.some(row=>row.id===id))) throw new Error('Treatment not found for reorder')
+      const ordered = [...treatmentIds,...current.filter(row=>!treatmentIds.includes(row.id)).map(row=>row.id)]
+      const offset = Math.max(0,...current.map(row=>row.priority))+ordered.length+1
+      const update = this.db.prepare('UPDATE tooth_treatments SET priority = ?, updated_at = ? WHERE id = ? AND patient_id = ? AND tooth_number = ?')
       const now = new Date().toISOString()
-
-      // Get current treatments to preserve other data
-      const getCurrentStmt = this.db.prepare(`
-        SELECT * FROM tooth_treatments
-        WHERE patient_id = ? AND tooth_number = ?
-        ORDER BY priority
-      `)
-      const currentTreatments = getCurrentStmt.all(patientId, toothNumber)
-
-      // Delete all treatments for this tooth temporarily
-      const deleteStmt = this.db.prepare(`
-        DELETE FROM tooth_treatments
-        WHERE patient_id = ? AND tooth_number = ?
-      `)
-      deleteStmt.run(patientId, toothNumber)
-
-      // Re-insert treatments in the new order
-      const insertStmt = this.db.prepare(`
-        INSERT INTO tooth_treatments (
-          id, patient_id, tooth_number, tooth_numbers, is_multi_tooth, tooth_name, treatment_type, treatment_category,
-          treatment_color, treatment_status, cost, start_date, completion_date,
-          notes, priority, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `)
-
-      treatmentIds.forEach((treatmentId, index) => {
-        const treatment = currentTreatments.find(t => t.id === treatmentId)
-        if (treatment) {
-          insertStmt.run(
-            treatment.id,
-            treatment.patient_id,
-            treatment.tooth_number,
-            treatment.tooth_numbers || String(treatment.tooth_number),
-            treatment.is_multi_tooth || 0,
-            treatment.tooth_name,
-            treatment.treatment_type,
-            treatment.treatment_category,
-            treatment.treatment_color,
-            treatment.treatment_status,
-            treatment.cost,
-            treatment.start_date,
-            treatment.completion_date,
-            treatment.notes,
-            index + 1, // New priority
-            treatment.created_at,
-            now // Updated timestamp
-          )
-        }
-      })
-    })
-
-    transaction()
+      ordered.forEach((id,index)=>update.run(offset+index,now,id,patientId,toothNumber))
+      ordered.forEach((id,index)=>update.run(index+1,now,id,patientId,toothNumber))
+    }).immediate()
   }
 
   // NEW: Tooth Treatment Images operations
@@ -6587,163 +5971,21 @@ async getToothTreatmentsByPatient(patientId) {
     }
   }
 
-  async getUnpaidToothTreatmentsByPatient(patientId) {
-    try {
-      this.ensureToothTreatmentsTableExists()
-      this.ensurePaymentsColumns()
+  async getUnpaidToothTreatmentsByPatient(patientId) { return PaymentRepository.prototype.getUnpaidToothTreatmentsByPatient.apply(this, [patientId]) }
 
-      const stmt = this.db.prepare(`
-        WITH treatment_paid AS (
-          SELECT
-            tooth_treatment_id,
-            COALESCE(SUM(COALESCE(total_amount, amount, 0)), 0) as total_paid
-          FROM payments
-          WHERE status IN ('completed', 'partial', 'paid')
-            AND tooth_treatment_id IS NOT NULL
-          GROUP BY tooth_treatment_id
-        )
-        SELECT tt.*,
-               a.title as appointment_title,
-               a.start_time as appointment_start_time,
-               COALESCE(tp.total_paid, 0) as total_paid,
-               MAX(COALESCE(tt.cost, 0) - COALESCE(tp.total_paid, 0), 0) as remaining_balance
-        FROM tooth_treatments tt
-        LEFT JOIN appointments a ON tt.appointment_id = a.id
-        LEFT JOIN treatment_paid tp ON tp.tooth_treatment_id = tt.id
-        WHERE tt.patient_id = ?
-          AND COALESCE(tt.cost, 0) > COALESCE(tp.total_paid, 0)
-        ORDER BY remaining_balance ASC, tt.tooth_number ASC, tt.priority ASC
-      `)
+  async createComprehensivePayment(patientId, totalAmount, paymentData) { return PaymentRepository.prototype.createComprehensivePayment.apply(this, [patientId, totalAmount, paymentData]) }
+  createToothTreatmentSync(...args) { return PaymentRepository.prototype.createToothTreatmentSync.apply(this, args) }
 
-      return stmt.all(patientId)
-    } catch (error) {
-      console.error('Error getting unpaid tooth treatments by patient:', error)
-      return []
-    }
-  }
+  projectPayment(...args) { return PaymentRepository.prototype.projectPayment.apply(this, args) }
 
-  async createComprehensivePayment(patientId, totalAmount, paymentData) {
-    const now = new Date().toISOString()
-    const discountAmount = paymentData.discount_amount || 0
-    const taxAmount = paymentData.tax_amount || 0
-    this.validatePaymentAmounts(totalAmount, discountAmount, taxAmount)
-    let amountToDistribute = totalAmount
-    const batchId = require('uuid').v4()
+  createPaymentSync(...args) { return PaymentRepository.prototype.createPaymentSync.apply(this, args) }
 
-    try {
-      const result = this.db.transaction(() => {
-        this.ensurePaymentsColumns()
+  paymentFields(...args) { return PaymentRepository.prototype.paymentFields.apply(this, args) }
 
-        const unpaidTreatments = this.db.prepare(`
-          SELECT tt.*,
-            COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0) as total_paid,
-            tt.cost - COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0) as remaining_balance
-          FROM tooth_treatments tt
-          WHERE tt.patient_id = ?
-          AND tt.cost > COALESCE((SELECT COALESCE(SUM(COALESCE(p.total_amount, p.amount, 0)), 0) FROM payments p WHERE p.tooth_treatment_id = tt.id AND p.status IN ('completed', 'partial', 'paid')), 0)
-          ORDER BY remaining_balance ASC
-        `).all(patientId)
+  validatePaymentRecord(...args) { return PaymentRepository.prototype.validatePaymentRecord.apply(this, args) }
 
-        if (unpaidTreatments.length === 0) {
-          return { success: false, message: 'هذا المريض ليس لديه علاجات غير مدفوعة', paymentsCreated: 0, distribution: [], batchId: null }
-        }
+  withFinancialRequest(...args) { return PaymentRepository.prototype.withFinancialRequest.apply(this, args) }
 
-        const totalRemaining = unpaidTreatments.reduce((sum, t) => sum + t.remaining_balance, 0)
-
-        if (totalRemaining <= 0) {
-          return { success: false, message: 'هذا المريض ليس لديه علاجات غير مدفوعة', paymentsCreated: 0, distribution: [], batchId: null }
-        }
-
-        if (amountToDistribute <= 0) {
-          return { success: false, message: 'المبلغ المدفوع يجب أن يكون أكبر من صفر', paymentsCreated: 0, distribution: [], batchId: null }
-        }
-
-        if (amountToDistribute > totalRemaining) {
-          amountToDistribute = totalRemaining
-        }
-
-        let remainingToDistribute = amountToDistribute
-        const distribution = []
-        const touchedTreatmentIds = new Set()
-
-        for (const treatment of unpaidTreatments) {
-          if (remainingToDistribute <= 0) break
-
-          const amountForThisTreatment = Math.min(remainingToDistribute, treatment.remaining_balance)
-          const newTotalPaid = treatment.total_paid + amountForThisTreatment
-          const newRemainingBalance = Math.max(0, treatment.cost - newTotalPaid)
-          const status = newRemainingBalance <= 0 ? 'completed' : 'partial'
-          const paymentId = require('uuid').v4()
-
-          this.db.prepare(`
-            INSERT INTO payments (
-              id, patient_id, tooth_treatment_id, amount, payment_method, payment_date,
-              description, receipt_number, status, notes, discount_amount, tax_amount,
-              total_amount, treatment_total_cost, treatment_total_paid, treatment_remaining_balance,
-              is_comprehensive, comprehensive_batch_id, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).run(
-            paymentId, patientId, treatment.id, amountForThisTreatment,
-            paymentData.payment_method, paymentData.payment_date,
-            paymentData.description || ('دفعة شاملة - السن ' + treatment.tooth_number),
-            paymentData.receipt_number || ('RCP-COMP-' + Date.now().toString().slice(-6)),
-            status, paymentData.notes, 0, 0, amountForThisTreatment,
-            treatment.cost, newTotalPaid, newRemainingBalance,
-            1, batchId, now, now
-          )
-
-          touchedTreatmentIds.add(treatment.id)
-          distribution.push({
-            paymentId,
-            treatmentId: treatment.id,
-            toothNumber: treatment.tooth_number,
-            toothName: treatment.tooth_name,
-            treatmentType: treatment.treatment_type,
-            treatmentCost: treatment.cost,
-            previousPaid: treatment.total_paid,
-            amountPaid: amountForThisTreatment,
-            newTotalPaid,
-            newRemainingBalance,
-            status
-          })
-          remainingToDistribute -= amountForThisTreatment
-        }
-
-        const clearCoveredPendingStmt = this.db.prepare(`
-          DELETE FROM payments
-          WHERE patient_id = ?
-            AND tooth_treatment_id = ?
-            AND status = 'pending'
-            AND is_comprehensive = 0
-        `)
-
-        distribution
-          .filter(item => item.newRemainingBalance <= 0)
-          .forEach(item => clearCoveredPendingStmt.run(patientId, item.treatmentId))
-
-        touchedTreatmentIds.forEach(treatmentId => {
-          this.updateToothTreatmentPaymentCalculationsSync(treatmentId)
-        })
-
-        return {
-          success: true,
-          message: ('تم توزيع الدفعة على ' + distribution.length + ' علاج بنجاح'),
-          paymentsCreated: distribution.length,
-          distribution,
-          batchId,
-          totalAmount: amountToDistribute,
-          totalRemaining,
-          remainingToDistribute: Math.max(0, remainingToDistribute)
-        }
-      })()
-
-      this.db.pragma('wal_checkpoint(TRUNCATE)')
-      return result
-    } catch (error) {
-      console.error('Error creating comprehensive payment:', error)
-      throw error
-    }
-  }
 }
 
 module.exports = { DatabaseService }

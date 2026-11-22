@@ -1,3 +1,4 @@
+import { usePaymentStore } from './paymentStore'
 import { create } from 'zustand'
 import { DentalTreatmentImage, ToothTreatment } from '@/types'
 
@@ -331,6 +332,11 @@ export const useDentalTreatmentStore = create<DentalTreatmentState>((set, get) =
     set({ isLoading: true, error: null })
     try {
       const newTreatment = await window.electronAPI.toothTreatments.create(treatmentData)
+      if (newTreatment.immediate_payment_id) {
+        await usePaymentStore.getState().loadPayments()
+        window.dispatchEvent(new CustomEvent('payment-changed', { detail: { type: 'created', paymentId: newTreatment.immediate_payment_id } }))
+        window.dispatchEvent(new CustomEvent('payment-added', { detail: { type: 'created', paymentId: newTreatment.immediate_payment_id } }))
+      }
       const { treatmentCache } = get()
 
       // ✅ CACHE FIX: Clear cache for the affected patient immediately

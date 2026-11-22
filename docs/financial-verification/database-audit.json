@@ -1,0 +1,408 @@
+{
+  "integrity": [
+    {
+      "quick_check": "ok"
+    }
+  ],
+  "tables": {
+    "patients": {
+      "count": 77,
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT"
+        },
+        {
+          "name": "serial_number",
+          "type": "TEXT"
+        },
+        {
+          "name": "full_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "gender",
+          "type": "TEXT"
+        },
+        {
+          "name": "age",
+          "type": "INTEGER"
+        },
+        {
+          "name": "patient_condition",
+          "type": "TEXT"
+        },
+        {
+          "name": "allergies",
+          "type": "TEXT"
+        },
+        {
+          "name": "medical_conditions",
+          "type": "TEXT"
+        },
+        {
+          "name": "email",
+          "type": "TEXT"
+        },
+        {
+          "name": "address",
+          "type": "TEXT"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT"
+        },
+        {
+          "name": "phone",
+          "type": "TEXT"
+        },
+        {
+          "name": "date_added",
+          "type": "DATETIME"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "patient_number",
+          "type": "INTEGER"
+        }
+      ],
+      "foreignKeys": []
+    },
+    "tooth_treatments": {
+      "count": 78,
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT"
+        },
+        {
+          "name": "patient_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "tooth_number",
+          "type": "INTEGER"
+        },
+        {
+          "name": "tooth_name",
+          "type": "TEXT"
+        },
+        {
+          "name": "treatment_type",
+          "type": "TEXT"
+        },
+        {
+          "name": "treatment_category",
+          "type": "TEXT"
+        },
+        {
+          "name": "treatment_status",
+          "type": "TEXT"
+        },
+        {
+          "name": "treatment_color",
+          "type": "TEXT"
+        },
+        {
+          "name": "start_date",
+          "type": "DATE"
+        },
+        {
+          "name": "completion_date",
+          "type": "DATE"
+        },
+        {
+          "name": "cost",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "priority",
+          "type": "INTEGER"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT"
+        },
+        {
+          "name": "appointment_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "tooth_numbers",
+          "type": "TEXT"
+        },
+        {
+          "name": "is_multi_tooth",
+          "type": "INTEGER"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "appointments",
+          "from": "appointment_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "patients",
+          "from": "patient_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ]
+    },
+    "appointments": {
+      "count": 76,
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT"
+        },
+        {
+          "name": "patient_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "treatment_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "title",
+          "type": "TEXT"
+        },
+        {
+          "name": "description",
+          "type": "TEXT"
+        },
+        {
+          "name": "start_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "end_time",
+          "type": "DATETIME"
+        },
+        {
+          "name": "status",
+          "type": "TEXT"
+        },
+        {
+          "name": "cost",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "treatments",
+          "from": "treatment_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "patients",
+          "from": "patient_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ]
+    },
+    "payments": {
+      "count": 79,
+      "columns": [
+        {
+          "name": "id",
+          "type": "TEXT"
+        },
+        {
+          "name": "patient_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "tooth_treatment_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "appointment_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "amount",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "payment_method",
+          "type": "TEXT"
+        },
+        {
+          "name": "payment_date",
+          "type": "DATETIME"
+        },
+        {
+          "name": "description",
+          "type": "TEXT"
+        },
+        {
+          "name": "receipt_number",
+          "type": "TEXT"
+        },
+        {
+          "name": "status",
+          "type": "TEXT"
+        },
+        {
+          "name": "notes",
+          "type": "TEXT"
+        },
+        {
+          "name": "discount_amount",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "tax_amount",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "total_amount",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "treatment_total_cost",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "treatment_total_paid",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "treatment_remaining_balance",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "total_amount_due",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "amount_paid",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "remaining_balance",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "is_comprehensive",
+          "type": "BOOLEAN"
+        },
+        {
+          "name": "comprehensive_batch_id",
+          "type": "TEXT"
+        },
+        {
+          "name": "created_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "updated_at",
+          "type": "DATETIME"
+        },
+        {
+          "name": "appointment_total_cost",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "appointment_total_paid",
+          "type": "DECIMAL(10,2)"
+        },
+        {
+          "name": "appointment_remaining_balance",
+          "type": "DECIMAL(10,2)"
+        }
+      ],
+      "foreignKeys": [
+        {
+          "id": 0,
+          "seq": 0,
+          "table": "appointments",
+          "from": "appointment_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL",
+          "match": "NONE"
+        },
+        {
+          "id": 1,
+          "seq": 0,
+          "table": "tooth_treatments",
+          "from": "tooth_treatment_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "SET NULL",
+          "match": "NONE"
+        },
+        {
+          "id": 2,
+          "seq": 0,
+          "table": "patients",
+          "from": "patient_id",
+          "to": "id",
+          "on_update": "NO ACTION",
+          "on_delete": "CASCADE",
+          "match": "NONE"
+        }
+      ]
+    }
+  },
+  "issues": {
+    "foreignKeyViolations": [],
+    "nonRevenueNonzero": 0,
+    "negativeAmounts": 0,
+    "orphanTreatments": 0,
+    "orphanPatients": 0,
+    "crossPatientTreatmentLinks": 0,
+    "crossPatientAppointmentLinks": 0,
+    "overpaidTreatments": 0
+  }
+}

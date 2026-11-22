@@ -1,3 +1,4 @@
+import { getTransactionAmount } from '@/services/paymentCore.mjs'
 /**
  * Financial Validation Utility
  * التحقق من صحة البيانات المالية بدقة 100%
@@ -91,17 +92,18 @@ export class FinancialValidator {
         return
       }
 
-      const amount = amountValidation.value
+      const amount = getTransactionAmount(payment)
 
       // حساب الإيرادات حسب الحالة
       switch (payment.status) {
+        case 'paid':
         case 'completed':
           completedAmount += amount
           totalRevenue += amount
           break
         case 'partial':
           // للمدفوعات الجزئية، استخدم amount_paid إذا كان متوفراً
-          const paidValidation = this.validateAmount(payment.amount_paid || payment.amount)
+          const paidValidation = this.validateAmount(getTransactionAmount(payment))
           if (paidValidation.isValid) {
             partialAmount += paidValidation.value
             totalRevenue += paidValidation.value

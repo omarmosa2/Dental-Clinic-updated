@@ -1,0 +1,50 @@
+{
+  "issues_count": 3,
+  "issues": [
+    {
+      "type": "lab_monthly_balance",
+      "balance_id": "lmb-001",
+      "reference_id": "lab-001:2026-8",
+      "stored": {
+        "cost": 2050,
+        "paid": 1230,
+        "remaining": 820
+      },
+      "direct": {
+        "cost": 0,
+        "paid": 0,
+        "remaining": 0
+      }
+    },
+    {
+      "type": "lab_monthly_balance",
+      "balance_id": "lmb-002",
+      "reference_id": "lab-002:2026-8",
+      "stored": {
+        "cost": 2300,
+        "paid": 1380,
+        "remaining": 920
+      },
+      "direct": {
+        "cost": 0,
+        "paid": 0,
+        "remaining": 0
+      }
+    },
+    {
+      "type": "lab_monthly_balance",
+      "balance_id": "lmb-003",
+      "reference_id": "lab-003:2026-8",
+      "stored": {
+        "cost": 2550,
+        "paid": 1530,
+        "remaining": 1020
+      },
+      "direct": {
+        "cost": 0,
+        "paid": 0,
+        "remaining": 0
+      }
+    }
+  ]
+}

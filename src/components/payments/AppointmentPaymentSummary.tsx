@@ -1,3 +1,4 @@
+import { calculateAppointmentPaymentDetails } from '@/utils/paymentCalculations'
 import React from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,17 +20,8 @@ export default function AppointmentPaymentSummary({
 }: AppointmentPaymentSummaryProps) {
   // حساب إحصائيات المدفوعات للموعد
   const appointmentCost = appointment.cost || 0
-  const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0)
-  const remainingBalance = Math.max(0, appointmentCost - totalPaid)
-  const paymentProgress = appointmentCost > 0 ? (totalPaid / appointmentCost) * 100 : 0
-
-  // تحديد حالة الدفع
-  let paymentStatus: 'completed' | 'partial' | 'pending' = 'pending'
-  if (remainingBalance <= 0 && appointmentCost > 0) {
-    paymentStatus = 'completed'
-  } else if (totalPaid > 0) {
-    paymentStatus = 'partial'
-  }
+  const { totalPaid, remainingBalance, status: paymentStatus } = calculateAppointmentPaymentDetails(appointment.id,appointmentCost,payments)
+  const paymentProgress = appointmentCost > 0 ? Math.min(100,totalPaid / appointmentCost * 100) : 0
 
   const getStatusColor = (status: string) => {
     switch (status) {

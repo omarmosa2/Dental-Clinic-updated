@@ -1,3 +1,4 @@
+import { getRevenueTransactionAmount, isRevenuePaymentStatus, sumPayments, summarizePaymentBalances, money } from './paymentCore.mjs'
 import type {
   Patient,
   Appointment,
@@ -15,7 +16,7 @@ import type {
   ReportData
 } from '../types'
 import { getTreatmentNameInArabic as getArabicTreatmentName, getCategoryNameInArabic as getArabicCategoryName, getStatusLabelInArabic as getArabicStatusLabel, getPaymentStatusInArabic as getArabicPaymentStatus } from '@/utils/arabicTranslations'
-import { getRevenueTransactionAmount, getTransactionAmount } from '@/utils/paymentCalculations'
+import { getTransactionAmount } from '@/utils/paymentCalculations'
 
 export class ReportsService {
 
@@ -499,43 +500,11 @@ export class ReportsService {
       .filter(e => e.status === 'paid')
       .reduce((sum, e) => sum + validateAmount(e.amount), 0)
 
-    const totalRevenue = filteredPayments
-      .filter(p => getRevenueTransactionAmount(p) > 0)
-      .reduce((sum, p) => {
-        // استخدام المبلغ الفعلي المدفوع في كل دفعة
-        const amount = getTransactionAmount(p)
-        return sum + amount
-      }, 0)
+    const totalRevenue = sumPayments(filteredPayments)
 
-    const totalPaid = filteredPayments
-      .filter(p => getRevenueTransactionAmount(p) > 0)
-      .reduce((sum, p) => {
-        // استخدام المبلغ الفعلي المدفوع في كل دفعة
-        const amount = getTransactionAmount(p)
-        return sum + amount
-      }, 0)
+    const totalPaid = sumPayments(filteredPayments)
 
-    const totalPending = filteredPayments
-      .filter(p => p.status === 'pending')
-      .reduce((sum, p) => {
-        // للمدفوعات المعلقة، استخدام المبلغ الإجمالي المطلوب إذا كان المبلغ المدفوع 0
-        const amount = validateAmount(p.amount)
-        const totalAmountDue = validateAmount(p.total_amount_due)
-
-        let pendingAmount = amount
-
-        if (p.tooth_treatment_id) {
-          // للمدفوعات المرتبطة بعلاجات، استخدم التكلفة الإجمالية للعلاج
-          const treatmentRemaining = validateAmount(p.treatment_remaining_balance || p.remaining_balance)
-          const treatmentCost = validateAmount(p.treatment_total_cost) || totalAmountDue
-          pendingAmount = treatmentRemaining > 0 ? treatmentRemaining : treatmentCost
-        } else if (amount === 0 && totalAmountDue > 0) {
-          // إذا كان المبلغ المدفوع 0 والمبلغ الإجمالي المطلوب أكبر من 0، استخدم المبلغ الإجمالي
-          pendingAmount = totalAmountDue
-        }
-
-        return sum + pendingAmount
-      }, 0)
+    const totalPending = summarizePaymentBalances(filteredPayments).pendingBalance
 
     // حساب إجمالي المبلغ المتبقي من الدفعات الجزئية فقط
     // تجميع المدفوعات حسب الموعد والعلاج
@@ -605,7 +574,7 @@ export class ReportsService {
     }
 
     filteredPayments
-      .filter(p => p.status === 'completed')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .forEach(payment => {
         const method = paymentMethodNames[payment.payment_method] || payment.payment_method || 'غير محدد'
         const amount = validateAmount(payment.amount)
@@ -633,7 +602,7 @@ export class ReportsService {
     const treatmentRevenue: { [key: string]: { amount: number; count: number } } = {}
 
     filteredPayments
-      .filter(p => p.status === 'completed' && p.appointment?.treatment_id)
+      .filter(p => isRevenuePaymentStatus(p.status) && p.appointment?.treatment_id)
       .forEach(payment => {
         const treatment = treatments.find(t => t.id === payment.appointment?.treatment_id)
         const treatmentName = treatment?.name || 'غير محدد'
@@ -642,7 +611,7 @@ export class ReportsService {
           treatmentRevenue[treatmentName] = { amount: 0, count: 0 }
         }
 
-        treatmentRevenue[treatmentName].amount += payment.amount
+        treatmentRevenue[treatmentName].amount = money(treatmentRevenue[treatmentName].amount + getRevenueTransactionAmount(payment))
         treatmentRevenue[treatmentName].count += 1
       })
 
@@ -657,13 +626,13 @@ export class ReportsService {
 
     // Revenue trend
     const revenueTrend = this.groupByPeriod(
-      filteredPayments.filter(p => p.status === 'completed'),
+      filteredPayments.filter(p => isRevenuePaymentStatus(p.status)),
       'month',
       'payment_date'
     ).map(group => ({
       period: group.period,
-      amount: group.data.reduce((sum, p) => sum + validateAmount(p.amount), 0),
-      revenue: group.data.reduce((sum, p) => sum + validateAmount(p.amount), 0) // Add revenue field for compatibility
+      amount: sumPayments(group.data),
+      revenue: sumPayments(group.data) // Add revenue field for compatibility
     }))
 
     // Calculate expenses data
@@ -707,13 +676,13 @@ export class ReportsService {
 
     // Outstanding payments
     const outstandingPayments = payments
-      .filter(p => ['pending', 'overdue', 'partial'].includes(p.status))
+      .filter(p => ['pending', 'overdue', 'partial'].includes(p.status) && (p.remaining_balance ?? p.treatment_remaining_balance ?? p.appointment_remaining_balance ?? 0) > 0)
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
       .slice(0, 20) // Top 20 outstanding payments
 
     // Recent transactions
     const recentTransactions = filteredPayments
-      .filter(p => p.status === 'completed')
+      .filter(p => isRevenuePaymentStatus(p.status))
       .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime())
       .slice(0, 10) // Last 10 transactions
 

@@ -929,9 +929,7 @@ ipcMain.handle('db:payments:create', async (_, payment) => {
       console.log('Creating payment:', newPayment)
       return newPayment
     } else {
-      const newPayment = { ...payment, id: Date.now().toString() }
-      console.log('Creating payment (mock):', newPayment)
-      return newPayment
+      throw new Error('قاعدة البيانات غير متاحة؛ لم يتم حفظ العملية')
     }
   } catch (error) {
     console.error('Error creating payment:', error)
@@ -946,9 +944,7 @@ ipcMain.handle('db:payments:update', async (_, id, payment) => {
       console.log('Updating payment:', updatedPayment)
       return updatedPayment
     } else {
-      const updatedPayment = { ...payment, id }
-      console.log('Updating payment (mock):', updatedPayment)
-      return updatedPayment
+      throw new Error('قاعدة البيانات غير متاحة؛ لم يتم حفظ العملية')
     }
   } catch (error) {
     console.error('Error updating payment:', error)
@@ -963,8 +959,7 @@ ipcMain.handle('db:payments:delete', async (_, id) => {
       console.log('Deleting payment:', id, 'Success:', success)
       return success
     } else {
-      console.log('Deleting payment (mock):', id)
-      return true
+      throw new Error('قاعدة البيانات غير متاحة؛ لم يتم حفظ العملية')
     }
   } catch (error) {
     console.error('Error deleting payment:', error)
@@ -2289,8 +2284,7 @@ ipcMain.handle('db:toothTreatments:create', async (_, treatment) => {
       console.log('Tooth treatment created successfully:', result.id)
       return result
     } else {
-      console.log('Creating tooth treatment (mock):', treatment)
-      return { ...treatment, id: 'mock-id', created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+      throw new Error('قاعدة البيانات غير متاحة؛ لم يتم حفظ العملية')
     }
   } catch (error) {
     console.error('Error creating tooth treatment:', error)
